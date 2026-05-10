@@ -109,7 +109,9 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
     { id: 'blue', color: 'bg-blue-500', name: 'Синий (iOS)' },
     { id: 'red', color: 'bg-red-500', name: 'Красный' },
     { id: 'green', color: 'bg-green-500', name: 'Зеленый' },
-    { id: 'orange', color: 'bg-orange-500', name: 'Оранжевый' }
+    { id: 'orange', color: 'bg-orange-500', name: 'Оранжевый' },
+    { id: 'purple', color: 'bg-purple-500', name: 'Пурпурный' },
+    { id: 'white', color: 'bg-white', name: 'Белый' }
   ];
 
   return (

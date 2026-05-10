@@ -105,7 +105,7 @@ export function Auth({ onSuccess }: AuthProps) {
                   type="text"
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                   placeholder="Как к вам обращаться?"
                   required
                 />
@@ -116,7 +116,7 @@ export function Auth({ onSuccess }: AuthProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                   placeholder="Минимум 6 символов"
                   required
                   minLength={6}
@@ -132,7 +132,7 @@ export function Auth({ onSuccess }: AuthProps) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                 placeholder="@username"
                 required
                 minLength={3}
@@ -148,7 +148,7 @@ export function Auth({ onSuccess }: AuthProps) {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                   placeholder="@username или без @"
                   required
                 />
@@ -159,7 +159,7 @@ export function Auth({ onSuccess }: AuthProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500/50 transition-colors"
+                  className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-blue-500/50 transition-colors"
                   placeholder="Введите пароль"
                   required
                   minLength={6}

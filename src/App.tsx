@@ -36,6 +36,18 @@ const THEMES: Record<string, { glow1: string, glow2: string, accentBtn: string, 
     accentBtn: 'bg-orange-500', accentHover: 'hover:bg-orange-400', accentGlow: 'shadow-orange-500/40',
     bubbleSent: 'bg-orange-600/40 border-orange-400/20 shadow-[0_8px_32px_-12px_rgba(234,88,12,0.4)] text-white',
     bgGradient: 'to-orange-950/20'
+  },
+  purple: {
+    glow1: 'bg-purple-600/20', glow2: 'bg-fuchsia-600/20',
+    accentBtn: 'bg-purple-500', accentHover: 'hover:bg-purple-400', accentGlow: 'shadow-purple-500/40',
+    bubbleSent: 'bg-purple-600/40 border-purple-400/20 shadow-[0_8px_32px_-12px_rgba(147,51,234,0.4)] text-white',
+    bgGradient: 'to-purple-950/20'
+  },
+  white: {
+    glow1: 'bg-white/10', glow2: 'bg-gray-400/10',
+    accentBtn: 'bg-white !text-black', accentHover: 'hover:bg-gray-200 !text-black', accentGlow: 'shadow-white/40',
+    bubbleSent: 'bg-white/90 border-transparent shadow-[0_8px_32px_-12px_rgba(255,255,255,0.4)] !text-black',
+    bgGradient: 'to-gray-900/50'
   }
 };
 
@@ -573,7 +585,7 @@ export default function App() {
   if (loading) return <div className="h-[100dvh] bg-[#020617] flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div></div>;
 
   return (
-    <div className="h-[100dvh] w-full bg-[#020617] text-white font-sans overflow-hidden flex flex-col relative">
+    <div className="h-[100dvh] w-full bg-[#020617] text-white font-sans flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
       {showSettings && (
         <SettingsModal 
           onClose={() => setShowSettings(false)} 
@@ -697,7 +709,7 @@ export default function App() {
                 placeholder="Search precise username..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-full bg-white/5 border border-white/10 text-sm focus:outline-none focus:border-white/50 text-white placeholder-white/50 transition-all`}
+                className={`w-full pl-10 pr-4 py-2.5 rounded-full bg-white/5 border border-white/10 text-base sm:text-sm focus:outline-none focus:border-white/50 text-white placeholder-white/50 transition-all`}
               />
             </div>
           </div>
@@ -758,7 +770,7 @@ export default function App() {
 
         {/* Main Chat Area */}
         <div 
-          className={`${!selectedUser ? 'hidden md:flex' : 'flex'} flex-1 flex-col relative z-20 bg-gradient-to-b from-transparent ${t.bgGradient} transition-colors duration-1000`}
+          className={`${!selectedUser ? 'hidden md:flex' : 'flex'} flex-1 flex-col relative z-20 bg-gradient-to-b from-transparent ${t.bgGradient} transition-colors duration-1000 min-w-0 w-full`}
           style={currentChatBg ? { backgroundImage: `url(${currentChatBg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
         >
           {currentChatBg && <div className="absolute inset-0 bg-black/60 z-0"></div>}
@@ -882,7 +894,7 @@ export default function App() {
               </div>
 
               {/* Messages Area */}
-              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 relative z-10">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 flex flex-col gap-4 relative z-10 min-w-0 w-full">
                 {chatMessages.map((msg) => {
                   const isMe = msg.senderId === user?.uid;
                   const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
@@ -890,27 +902,14 @@ export default function App() {
                   const canEditDelete = isMe || isAdmin;
                   const time = msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now';
                   return (
-                    <div key={msg.id} className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'self-end' : 'self-start'}`}>
-                      <div className="flex items-center gap-2">
-                        {canEditDelete && isMe && (
-                          <div className="hidden group-hover:flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
-                            {msg.type === 'text' && (
-                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 text-white hover:text-blue-400">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                              </button>
-                            )}
-                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-white hover:text-red-400">
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                        <div 
-                          className={`px-5 py-4 rounded-2xl text-sm leading-relaxed relative flex-1 ${
-                            isMe 
-                              ? `${t.bubbleSent} rounded-tr-none` 
-                              : 'bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]'
-                          }`}
-                        >
+                    <div key={msg.id} className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} max-w-[92%] sm:max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ${isMe ? 'self-end' : 'self-start'} min-w-0`}>
+                      <div 
+                        className={`px-3.5 py-2.5 sm:px-5 sm:py-4 rounded-2xl text-[15px] sm:text-sm leading-relaxed relative break-words [word-break:break-word] [overflow-wrap:anywhere] whitespace-pre-wrap min-w-0 ${
+                          isMe 
+                            ? `${t.bubbleSent} rounded-tr-none shadow-lg shadow-${t.primary}/20` 
+                            : 'bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]'
+                        }`}
+                      >
                           {editingMessage?.id === msg.id ? (
                             <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
                               <input 
@@ -925,13 +924,13 @@ export default function App() {
                               </div>
                             </form>
                           ) : msg.type === 'image' && msg.url ? (
-                            <div className="mt-1 mb-2 cursor-pointer" onClick={() => setViewerImage(msg.url)}>
+                            <div className="mt-1 mb-2 cursor-pointer overflow-hidden rounded-xl" onClick={() => setViewerImage(msg.url)}>
                               <img src={msg.url} alt="Uploaded" className="rounded-xl max-w-full max-h-64 object-cover hover:opacity-90 transition-opacity" />
                             </div>
                           ) : msg.type === 'file' && msg.url ? (
                             <a href={msg.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-200 hover:text-white underline mt-1 mb-2">
-                              <Paperclip className="w-4 h-4" />
-                              <span className="truncate">{msg.text}</span>
+                              <Paperclip className="w-4 h-4 shrink-0" />
+                              <span className="truncate min-w-0">{msg.text}</span>
                             </a>
                           ) : msg.type === 'audio' && msg.url ? (
                             <div className="mt-1 mb-2">
@@ -941,29 +940,32 @@ export default function App() {
                             msg.text
                           )}
                         </div>
-                        {canEditDelete && !isMe && (
-                          <div className="hidden group-hover:flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
+                      
+                      <div className={`flex items-center mt-1.5 gap-2 px-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                        <span className="text-[11px] text-white/40 font-medium select-none whitespace-nowrap">
+                          {time} {msg.isEdited && '(исправлено)'}
+                        </span>
+                        
+                        {canEditDelete && (
+                          <div className={`flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
                             {msg.type === 'text' && (
-                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 text-white hover:text-blue-400">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 sm:p-1 text-white/50 hover:text-blue-400 active:scale-95 transition-transform" title="Редактировать">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                               </button>
                             )}
-                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-white hover:text-red-400">
-                              <X className="w-3.5 h-3.5" />
+                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 sm:p-1 text-white/50 hover:text-red-400 active:scale-95 transition-transform" title="Удалить">
+                              <X className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
                             </button>
                           </div>
                         )}
                       </div>
-                      <span className="text-[11px] text-white/40 mt-1 px-1 font-medium select-none">
-                        {time} {msg.isEdited && '(исправлено)'}
-                      </span>
                     </div>
                   );
                 })}
               </div>
 
               {/* Input Area */}
-              <div className="p-4 sm:p-8 pt-4 relative z-10">
+              <div className="p-4 sm:p-8 pt-4 relative z-10 min-w-0 w-full">
                 {!userData?.friends?.includes(selectedUser.id) ? (
                   <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[28px] text-center text-white/70 border-dashed border-white/20">
                     <div className="mb-2 text-sm">Сначала добавьте пользователя в друзья, чтобы начать переписку! (Новый чат будет доступен после добавления)</div>
@@ -998,26 +1000,26 @@ export default function App() {
                   )}
                   
                   <form onSubmit={handleSend} className="bg-white/5 backdrop-blur-2xl border border-white/10 p-2 rounded-[28px] flex items-center gap-1">
-                  <div className="flex gap-1 pl-2">
-                    <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors">
+                  <div className="flex gap-1 pl-2 shrink-0">
+                    <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
                       <Smile className="w-5 h-5" />
                     </button>
                     
                     <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
-                    <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors hidden sm:block">
+                    <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
                       <ImageIcon className="w-5 h-5" />
                     </button>
                     
                     <input type="file" ref={fileInputRef} className="hidden" accept="*" onChange={(e) => handleFileUpload(e, false)} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors hidden sm:block">
+                    <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
                       <Paperclip className="w-5 h-5" />
                     </button>
                   </div>
                   
                   {isRecording ? (
-                    <div className="flex-1 px-4 py-2 text-sm text-red-400 font-medium flex items-center gap-2 animate-pulse">
-                      <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                      Recording {formatTime(recordingTime)}...
+                    <div className="flex-1 px-4 py-2 text-sm text-red-400 font-medium flex items-center gap-2 animate-pulse min-w-0">
+                      <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
+                      <span className="truncate">Recording {formatTime(recordingTime)}...</span>
                     </div>
                   ) : (
                     <textarea 
@@ -1030,22 +1032,22 @@ export default function App() {
                         }
                       }}
                       placeholder="Enter signal..." 
-                      className="flex-1 bg-transparent px-4 py-2 text-sm text-white placeholder-white/40 focus:outline-none resize-none min-h-[40px] max-h-32 scrollbar-hide"
+                      className="flex-1 bg-transparent px-2 sm:px-4 py-2 text-base sm:text-sm text-white placeholder-white/40 focus:outline-none resize-none min-h-[40px] max-h-32 scrollbar-hide min-w-0"
                       rows={1}
                     />
                   )}
                   
-                  <div className="pr-1 flex gap-1 items-center">
+                  <div className="pr-1 flex gap-1 items-center shrink-0">
                     {!inputValue.trim() && !isRecording ? (
-                      <button type="button" onClick={startRecording} className="w-10 h-10 flex items-center justify-center bg-transparent hover:bg-white/10 text-white/60 rounded-full transition-colors">
+                      <button type="button" onClick={startRecording} className="w-10 h-10 flex items-center justify-center bg-transparent hover:bg-white/10 text-white/60 rounded-full transition-colors shrink-0">
                         <Mic className="w-5 h-5" />
                       </button>
                     ) : isRecording ? (
-                      <button type="button" onClick={stopRecording} className="w-10 h-10 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-full transition-colors">
+                      <button type="button" onClick={stopRecording} className="w-10 h-10 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-full transition-colors shrink-0">
                         <Square className="w-4 h-4 fill-current" />
                       </button>
                     ) : (
-                      <button type="submit" className={`w-12 h-10 flex items-center justify-center ${t.accentBtn} ${t.accentHover} text-white rounded-2xl transition-colors shadow-lg ${t.accentGlow}`}>
+                      <button type="submit" className={`w-12 h-10 flex items-center justify-center ${t.accentBtn} ${t.accentHover} text-white rounded-2xl transition-colors shadow-lg ${t.accentGlow} shrink-0`}>
                         <Send className="w-5 h-5" />
                       </button>
                     )}
