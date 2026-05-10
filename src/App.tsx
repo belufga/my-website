@@ -259,14 +259,15 @@ export default function App() {
   }, [user, selectedUser]);
 
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const clearTypingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTypingWriteRef = useRef<number>(0);
 
   const handleTyping = (text: string) => {
     setInputValue(text);
     if (!user || !selectedUser) return;
     
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (clearTypingTimeoutRef.current) clearTimeout(clearTypingTimeoutRef.current);
     
     // Immediately clear typing if blank
     if (!text.trim()) {
@@ -276,11 +277,29 @@ export default function App() {
       return;
     }
 
-    typingTimeoutRef.current = setTimeout(() => {
+    // Set a timeout to clear typing status after 10 seconds of inactivity
+    clearTypingTimeoutRef.current = setTimeout(() => {
+      updateDoc(doc(db, 'users', user.uid), {
+        [`typingTo.${selectedUser.id}`]: ''
+      }).catch(() => {});
+    }, 10000);
+
+    const now = Date.now();
+    // Throttle writes to Firebase (max once per second) while typing
+    if (now - lastTypingWriteRef.current > 1000) {
+      lastTypingWriteRef.current = now;
       updateDoc(doc(db, 'users', user.uid), {
         [`typingTo.${selectedUser.id}`]: text
       }).catch(() => {});
-    }, 500);
+    } else {
+      // Ensure the final typed version is sent if they pause for 500ms
+      typingTimeoutRef.current = setTimeout(() => {
+        lastTypingWriteRef.current = Date.now();
+        updateDoc(doc(db, 'users', user.uid), {
+          [`typingTo.${selectedUser.id}`]: text
+        }).catch(() => {});
+      }, 500);
+    }
   };
 
   const handleSend = async (e: React.FormEvent) => {
@@ -293,6 +312,8 @@ export default function App() {
     playNotificationSound('send');
     
     // Clear typing draft immediately when sending
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    if (clearTypingTimeoutRef.current) clearTimeout(clearTypingTimeoutRef.current);
     updateDoc(doc(db, 'users', user.uid), {
       [`typingTo.${selectedUser.id}`]: ''
     }).catch(() => {});
