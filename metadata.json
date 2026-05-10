@@ -1,6 +1,8 @@
 {
   "name": "KonataChat",
   "description": "iOS 26 style glassmorphism messenger.",
-  "requestFramePermissions": [],
+  "requestFramePermissions": [
+    "microphone"
+  ],
   "majorCapabilities": []
 }

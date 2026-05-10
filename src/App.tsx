@@ -2,93 +2,511 @@
  * @license
  * SPDX-License-Identifier: Apache-2.0
  */
-import React, { useState, useEffect, useRef } from 'react';
-import { Send, Menu, Search, ChevronLeft, MoreVertical, Image as ImageIcon, Smile, LogOut, Mic, Settings, Paperclip, X, Square, Bell, Check, UserPlus, UserMinus } from 'lucide-react';
-import { auth, db, storage } from './lib/firebase';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { Auth } from './components/Auth';
-import { SettingsModal } from './components/SettingsModal';
-import EmojiPicker from 'emoji-picker-react';
+import React, { useState, useEffect, useRef } from "react";
+import {
+  Send,
+  Menu,
+  Search,
+  ChevronLeft,
+  MoreVertical,
+  Image as ImageIcon,
+  Smile,
+  LogOut,
+  Mic,
+  Settings,
+  Paperclip,
+  X,
+  Square,
+  Bell,
+  Check,
+  UserPlus,
+  UserMinus,
+  Phone,
+  Video,
+  PhoneCall,
+  PhoneOff,
+} from "lucide-react";
+import { auth, db, storage } from "./lib/firebase";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  collection,
+  query,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  serverTimestamp,
+  doc,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  deleteField,
+  setDoc,
+} from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { Auth } from "./components/Auth";
+import { SettingsModal } from "./components/SettingsModal";
+import EmojiPicker from "emoji-picker-react";
 
-const THEMES: Record<string, { glow1: string, glow2: string, accentBtn: string, accentHover: string, accentGlow: string, bubbleSent: string, bgGradient: string }> = {
+const THEMES: Record<
+  string,
+  {
+    glow1: string;
+    glow2: string;
+    accentBtn: string;
+    accentHover: string;
+    accentGlow: string;
+    bubbleSent: string;
+    bgGradient: string;
+  }
+> = {
   blue: {
-    glow1: 'bg-blue-600/20', glow2: 'bg-indigo-600/20',
-    accentBtn: 'bg-blue-500', accentHover: 'hover:bg-blue-400', accentGlow: 'shadow-blue-500/40',
-    bubbleSent: 'bg-blue-600/40 border-blue-400/20 shadow-[0_8px_32px_-12px_rgba(37,99,235,0.4)] text-white',
-    bgGradient: 'to-blue-950/20'
+    glow1: "bg-blue-600/20",
+    glow2: "bg-indigo-600/20",
+    accentBtn: "bg-blue-500",
+    accentHover: "hover:bg-blue-400",
+    accentGlow: "shadow-blue-500/40",
+    bubbleSent:
+      "bg-blue-600/40 border-blue-400/20 shadow-[0_8px_32px_-12px_rgba(37,99,235,0.4)] text-white",
+    bgGradient: "to-blue-950/20",
   },
   red: {
-    glow1: 'bg-red-600/20', glow2: 'bg-orange-600/20',
-    accentBtn: 'bg-red-500', accentHover: 'hover:bg-red-400', accentGlow: 'shadow-red-500/40',
-    bubbleSent: 'bg-red-600/40 border-red-400/20 shadow-[0_8px_32px_-12px_rgba(220,38,38,0.4)] text-white',
-    bgGradient: 'to-red-950/20'
+    glow1: "bg-red-600/20",
+    glow2: "bg-orange-600/20",
+    accentBtn: "bg-red-500",
+    accentHover: "hover:bg-red-400",
+    accentGlow: "shadow-red-500/40",
+    bubbleSent:
+      "bg-red-600/40 border-red-400/20 shadow-[0_8px_32px_-12px_rgba(220,38,38,0.4)] text-white",
+    bgGradient: "to-red-950/20",
   },
   green: {
-    glow1: 'bg-green-600/20', glow2: 'bg-emerald-600/20',
-    accentBtn: 'bg-green-500', accentHover: 'hover:bg-green-400', accentGlow: 'shadow-green-500/40',
-    bubbleSent: 'bg-green-600/40 border-green-400/20 shadow-[0_8px_32px_-12px_rgba(22,163,74,0.4)] text-white',
-    bgGradient: 'to-green-950/20'
+    glow1: "bg-green-600/20",
+    glow2: "bg-emerald-600/20",
+    accentBtn: "bg-green-500",
+    accentHover: "hover:bg-green-400",
+    accentGlow: "shadow-green-500/40",
+    bubbleSent:
+      "bg-green-600/40 border-green-400/20 shadow-[0_8px_32px_-12px_rgba(22,163,74,0.4)] text-white",
+    bgGradient: "to-green-950/20",
   },
   orange: {
-    glow1: 'bg-orange-600/20', glow2: 'bg-amber-600/20',
-    accentBtn: 'bg-orange-500', accentHover: 'hover:bg-orange-400', accentGlow: 'shadow-orange-500/40',
-    bubbleSent: 'bg-orange-600/40 border-orange-400/20 shadow-[0_8px_32px_-12px_rgba(234,88,12,0.4)] text-white',
-    bgGradient: 'to-orange-950/20'
+    glow1: "bg-orange-600/20",
+    glow2: "bg-amber-600/20",
+    accentBtn: "bg-orange-500",
+    accentHover: "hover:bg-orange-400",
+    accentGlow: "shadow-orange-500/40",
+    bubbleSent:
+      "bg-orange-600/40 border-orange-400/20 shadow-[0_8px_32px_-12px_rgba(234,88,12,0.4)] text-white",
+    bgGradient: "to-orange-950/20",
   },
   purple: {
-    glow1: 'bg-purple-600/20', glow2: 'bg-fuchsia-600/20',
-    accentBtn: 'bg-purple-500', accentHover: 'hover:bg-purple-400', accentGlow: 'shadow-purple-500/40',
-    bubbleSent: 'bg-purple-600/40 border-purple-400/20 shadow-[0_8px_32px_-12px_rgba(147,51,234,0.4)] text-white',
-    bgGradient: 'to-purple-950/20'
+    glow1: "bg-purple-600/20",
+    glow2: "bg-fuchsia-600/20",
+    accentBtn: "bg-purple-500",
+    accentHover: "hover:bg-purple-400",
+    accentGlow: "shadow-purple-500/40",
+    bubbleSent:
+      "bg-purple-600/40 border-purple-400/20 shadow-[0_8px_32px_-12px_rgba(147,51,234,0.4)] text-white",
+    bgGradient: "to-purple-950/20",
   },
   white: {
-    glow1: 'bg-white/10', glow2: 'bg-gray-400/10',
-    accentBtn: 'bg-white !text-black', accentHover: 'hover:bg-gray-200 !text-black', accentGlow: 'shadow-white/40',
-    bubbleSent: 'bg-white/90 border-transparent shadow-[0_8px_32px_-12px_rgba(255,255,255,0.4)] !text-black',
-    bgGradient: 'to-gray-900/50'
-  }
+    glow1: "bg-white/10",
+    glow2: "bg-gray-400/10",
+    accentBtn: "bg-white !text-black",
+    accentHover: "hover:bg-gray-200 !text-black",
+    accentGlow: "shadow-white/40",
+    bubbleSent:
+      "bg-white/90 border-transparent shadow-[0_8px_32px_-12px_rgba(255,255,255,0.4)] !text-black",
+    bgGradient: "to-gray-900/50",
+  },
 };
 
 interface Message {
   id: string;
   text: string;
-  sender: 'me' | 'other';
+  sender: "me" | "other";
   time: string;
 }
 
 export default function App() {
-  const [inputValue, setInputValue] = useState('');
+  const [inputValue, setInputValue] = useState("");
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState<any[]>([]);
   const [selectedUser, setSelectedUser] = useState<any | null>(null);
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
   const [lastMessageTime, setLastMessageTime] = useState(0);
   const [editingMessage, setEditingMessage] = useState<any | null>(null);
-  const [editingText, setEditingText] = useState('');
+  const [editingText, setEditingText] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [theme, setTheme] = useState('blue');
+  const pcRef = useRef<RTCPeerConnection | null>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const [callState, setCallState] = useState<
+    "idle" | "calling" | "incoming" | "connected"
+  >("idle");
+  const [callData, setCallData] = useState<{
+    chatId: string;
+    callerId: string;
+    receiverId: string;
+    isOut: boolean;
+    callerName?: string;
+  } | null>(null);
+  const callUnsubRef = useRef<(() => void) | null>(null);
+  const candidatesUnsubRef = useRef<(() => void) | null>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement | null>(null);
+  const ringtoneAudioRef = useRef<HTMLAudioElement | null>(null);
+  const callingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
+  const [theme, setTheme] = useState("blue");
   const [userData, setUserData] = useState<any>(null);
+
+  const ringtones: Record<string, string> = {
+    modern: "https://actions.google.com/sounds/v1/ringtones/phone_ringing.ogg",
+    digital:
+      "https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg",
+    retro:
+      "https://actions.google.com/sounds/v1/alarms/mechanical_clock_ring.ogg",
+    calling: "https://actions.google.com/sounds/v1/ringtones/phone_ringing.ogg",
+  };
+
+  useEffect(() => {
+    if (!ringtoneAudioRef.current) {
+      ringtoneAudioRef.current = new Audio();
+    }
+    const audio = ringtoneAudioRef.current;
+
+    if (callState === "calling") {
+      audio.loop = true;
+      audio.src = ringtones.calling;
+      audio.play().catch(() => {});
+    } else if (callState === "incoming") {
+      audio.loop = true;
+      const type = userData?.ringtone || "modern";
+      audio.src = ringtones[type] || ringtones.modern;
+      audio.play().catch(() => {});
+    } else if (callState === "connected") {
+      audio.pause();
+      audio.loop = false;
+      audio.src = "https://actions.google.com/sounds/v1/water/water_drop.ogg";
+      audio.play().catch(() => {});
+    } else {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  }, [callState]);
+
+  const configuration = {
+    iceServers: [
+      {
+        urls: [
+          "stun:stun1.l.google.com:19302",
+          "stun:stun2.l.google.com:19302",
+        ],
+      },
+    ],
+  };
+
+  const cleanupCall = () => {
+    if (pcRef.current) {
+      pcRef.current.close();
+      pcRef.current = null;
+    }
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((t) => t.stop());
+      localStreamRef.current = null;
+    }
+    if (callUnsubRef.current) callUnsubRef.current();
+    if (candidatesUnsubRef.current) candidatesUnsubRef.current();
+    if (callingTimeoutRef.current) {
+      clearTimeout(callingTimeoutRef.current);
+      callingTimeoutRef.current = null;
+    }
+
+    setCallState("idle");
+    setCallData(null);
+    setIsMuted(false);
+  };
+
+  const startCall = async (receiver: any) => {
+    if (!user) return;
+    const chatId = [user.uid, receiver.id].sort().join("_");
+    setCallState("calling");
+    setCallData({
+      chatId,
+      callerId: user.uid,
+      receiverId: receiver.id,
+      isOut: true,
+    });
+    callingTimeoutRef.current = setTimeout(() => {
+      endCall();
+    }, 45000);
+
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      localStreamRef.current = localStream;
+
+      const pc = new RTCPeerConnection(configuration);
+      pcRef.current = pc;
+
+      localStream
+        .getTracks()
+        .forEach((track) => pc.addTrack(track, localStream));
+
+      pc.ontrack = (event) => {
+        if (remoteAudioRef.current && !remoteAudioRef.current.srcObject) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      const callDoc = doc(db, `chats/${chatId}/call`, "active");
+      const offerCandidates = collection(callDoc, "callerCandidates");
+      const answerCandidates = collection(callDoc, "receiverCandidates");
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(offerCandidates, event.candidate.toJSON());
+        }
+      };
+
+      const offerDescription = await pc.createOffer();
+      await pc.setLocalDescription(offerDescription);
+
+      const callWithOffer = {
+        offer: { type: offerDescription.type, sdp: offerDescription.sdp },
+        callerId: user.uid,
+        receiverId: receiver.id,
+        status: "calling",
+        createdAt: serverTimestamp(),
+      };
+
+      await updateDoc(doc(db, "users", receiver.id), {
+        incomingCall: {
+          chatId,
+          callerId: user.uid,
+          callerName: userData?.displayName || "Someone",
+          type: "audio",
+        },
+      }).catch(() => {});
+      await setDoc(callDoc, callWithOffer);
+
+      callUnsubRef.current = onSnapshot(callDoc, async (snapshot) => {
+        const data = snapshot.data();
+        if (!pc.currentRemoteDescription && data?.answer) {
+          const answerDescription = new RTCSessionDescription(data.answer);
+          await pc.setRemoteDescription(answerDescription);
+          setCallState("connected");
+
+          candidatesUnsubRef.current = onSnapshot(
+            answerCandidates,
+            (candSnapshot) => {
+              candSnapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                  const candidate = new RTCIceCandidate(change.doc.data());
+                  pc.addIceCandidate(candidate).catch((e) => console.error(e));
+                }
+              });
+            },
+          );
+        }
+        if (data?.status === "ended" || !snapshot.exists()) {
+          if (user) {
+            updateDoc(doc(db, "users", user.uid), {
+              incomingCall: deleteField(),
+            }).catch(() => {});
+          }
+          cleanupCall();
+        }
+      });
+    } catch (e: any) {
+      console.error("Call failed:", e);
+      if (e.name === "NotAllowedError" || e.message.includes("not allowed")) {
+        alert(
+          "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
+        );
+      } else {
+        alert("Ошибка при звонке: " + (e as Error).message);
+      }
+      cleanupCall();
+    }
+  };
+
+  const answerCall = async () => {
+    if (!user || !userData?.incomingCall) return;
+    const { chatId, callerId } = userData.incomingCall;
+
+    setCallState("connected");
+    setCallData({ chatId, callerId, receiverId: user.uid, isOut: false });
+
+    try {
+      const localStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+      localStreamRef.current = localStream;
+
+      const pc = new RTCPeerConnection(configuration);
+      pcRef.current = pc;
+
+      localStream
+        .getTracks()
+        .forEach((track) => pc.addTrack(track, localStream));
+
+      pc.ontrack = (event) => {
+        if (remoteAudioRef.current && !remoteAudioRef.current.srcObject) {
+          remoteAudioRef.current.srcObject = event.streams[0];
+        }
+      };
+
+      const callDoc = doc(db, `chats/${chatId}/call`, "active");
+      const offerCandidates = collection(callDoc, "callerCandidates");
+      const answerCandidates = collection(callDoc, "receiverCandidates");
+
+      pc.onicecandidate = (event) => {
+        if (event.candidate) {
+          addDoc(answerCandidates, event.candidate.toJSON());
+        }
+      };
+
+      const callDataSnapshot = await getDoc(callDoc);
+      const callDataDoc = callDataSnapshot.data();
+      if (!callDataDoc?.offer) {
+        cleanupCall();
+        return;
+      }
+
+      const offerDescription = new RTCSessionDescription(callDataDoc.offer);
+      await pc.setRemoteDescription(offerDescription);
+
+      const answerDescription = await pc.createAnswer();
+      await pc.setLocalDescription(answerDescription);
+
+      await updateDoc(callDoc, {
+        answer: { type: answerDescription.type, sdp: answerDescription.sdp },
+        status: "connected",
+      });
+      await updateDoc(doc(db, "users", user.uid), {
+        incomingCall: deleteField(),
+      });
+
+      callUnsubRef.current = onSnapshot(callDoc, (snapshot) => {
+        const data = snapshot.data();
+        if (data?.status === "ended" || !snapshot.exists()) {
+          if (user) {
+            updateDoc(doc(db, "users", user.uid), {
+              incomingCall: deleteField(),
+            }).catch(() => {});
+          }
+          cleanupCall();
+        }
+      });
+
+      candidatesUnsubRef.current = onSnapshot(offerCandidates, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            const candidate = new RTCIceCandidate(change.doc.data());
+            pc.addIceCandidate(candidate).catch((e) => console.log("ICE candidate error:", e));
+          }
+        });
+      });
+    } catch (e: any) {
+      console.error("Answer failed:", e);
+      if (e.name === "NotAllowedError" || e.message.includes("not allowed")) {
+        alert(
+          "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
+        );
+      } else {
+        alert("Ошибка при ответе: " + (e as Error).message);
+      }
+      cleanupCall();
+    }
+  };
+
+  const endCall = async () => {
+    if (callData) {
+      const { chatId, isOut, receiverId } = callData;
+      if (isOut) {
+        if (receiverId) {
+          try {
+            await updateDoc(doc(db, "users", receiverId), {
+              incomingCall: deleteField(),
+            });
+          } catch (e) {}
+        }
+        try {
+          await updateDoc(doc(db, `chats/${chatId}/call`, "active"), {
+            status: "ended",
+          });
+        } catch (e) {}
+        try {
+          await deleteDoc(doc(db, `chats/${chatId}/call`, "active"));
+        } catch (e) {}
+      } else {
+        if (user) {
+          try {
+            await updateDoc(doc(db, "users", user.uid), {
+              incomingCall: deleteField(),
+            });
+          } catch (e) {}
+        }
+        try {
+          await updateDoc(doc(db, `chats/${chatId}/call`, "active"), {
+            status: "ended",
+          });
+        } catch (e) {}
+      }
+    } else if (user) {
+      try {
+        await updateDoc(doc(db, "users", user.uid), {
+          incomingCall: deleteField(),
+        });
+      } catch (e) {}
+    }
+    cleanupCall();
+  };
+
+  const toggleMute = () => {
+    if (localStreamRef.current) {
+      localStreamRef.current.getAudioTracks().forEach((track) => {
+        track.enabled = !track.enabled;
+      });
+      setIsMuted(!localStreamRef.current.getAudioTracks()[0].enabled);
+    }
+  };
+
+  useEffect(() => {
+    if (userData?.incomingCall && callState === "idle") {
+      setCallState("incoming");
+      setCallData(userData.incomingCall);
+    } else if (!userData?.incomingCall && callState === "incoming") {
+      setCallState("idle");
+      setCallData(null);
+    }
+  }, [userData?.incomingCall]);
 
   // Extras
   const [showEmoji, setShowEmoji] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
-  
+
   // Chat specific options
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const chatBgInputRef = useRef<HTMLInputElement>(null);
 
-  const currentChatId = user && selectedUser ? [user.uid, selectedUser.id].sort().join('_') : null;
-  const currentChatBg = currentChatId && userData?.chatBackgrounds?.[currentChatId] ? userData.chatBackgrounds[currentChatId] : '';
-  const activeSelectedUser = users.find(u => u.id === selectedUser?.id) || selectedUser;
+  const currentChatId =
+    user && selectedUser ? [user.uid, selectedUser.id].sort().join("_") : null;
+  const currentChatBg =
+    currentChatId && userData?.chatBackgrounds?.[currentChatId]
+      ? userData.chatBackgrounds[currentChatId]
+      : "";
+  const activeSelectedUser =
+    users.find((u) => u.id === selectedUser?.id) || selectedUser;
 
-  
   // Audio Recording
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
@@ -101,19 +519,20 @@ export default function App() {
 
   const t = THEMES[theme] || THEMES.blue;
 
-  const playNotificationSound = (type: 'send' | 'receive' | 'friend') => {
+  const playNotificationSound = (type: "send" | "receive" | "friend") => {
     try {
-      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioContext =
+        window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      
+
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
-      if (type === 'friend') {
-        osc.type = 'triangle';
+
+      if (type === "friend") {
+        osc.type = "triangle";
         osc.frequency.setValueAtTime(500, ctx.currentTime);
         osc.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
         osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.2);
@@ -122,8 +541,8 @@ export default function App() {
         gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.4);
-      } else if (type === 'send') {
-        osc.type = 'sine';
+      } else if (type === "send") {
+        osc.type = "sine";
         osc.frequency.setValueAtTime(400, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.1);
         gain.gain.setValueAtTime(0, ctx.currentTime);
@@ -132,7 +551,7 @@ export default function App() {
         osc.start(ctx.currentTime);
         osc.stop(ctx.currentTime + 0.1);
       } else {
-        osc.type = 'sine';
+        osc.type = "sine";
         osc.frequency.setValueAtTime(600, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(800, ctx.currentTime + 0.15);
         gain.gain.setValueAtTime(0, ctx.currentTime);
@@ -142,7 +561,7 @@ export default function App() {
         osc.stop(ctx.currentTime + 0.15);
       }
     } catch (e) {
-      console.error('Audio play failed', e);
+      console.error("Audio play failed", e);
     }
   };
 
@@ -158,26 +577,28 @@ export default function App() {
   // Online Heartbeat
   useEffect(() => {
     if (!user) return;
-    
+
     const updateOnlineStatus = () => {
-      updateDoc(doc(db, 'users', user.uid), { lastActive: Date.now() }).catch(() => {});
+      updateDoc(doc(db, "users", user.uid), { lastActive: Date.now() }).catch(
+        () => {},
+      );
     };
-    
+
     // Immediate update
     updateOnlineStatus();
 
     const interval = setInterval(updateOnlineStatus, 30000); // 30s heartbeat
-    
+
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === "visible") {
         updateOnlineStatus();
       }
     };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
   }, [user]);
 
@@ -186,33 +607,41 @@ export default function App() {
 
   useEffect(() => {
     if (!user) return;
-    
+
     // Listen to user data
-    const userUnsubscribe = onSnapshot(doc(db, 'users', user.uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserData(data);
-        if (data.theme) setTheme(data.theme);
-        
-        const reqs = data.friendRequests || [];
-        if (reqs.length > prevFriendRequestsRef.current) {
-          playNotificationSound('friend');
+    const userUnsubscribe = onSnapshot(
+      doc(db, "users", user.uid),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setUserData(data);
+          if (data.theme) setTheme(data.theme);
+
+          const reqs = data.friendRequests || [];
+          if (reqs.length > prevFriendRequestsRef.current) {
+            playNotificationSound("friend");
+          }
+          prevFriendRequestsRef.current = reqs.length;
         }
-        prevFriendRequestsRef.current = reqs.length;
-      }
-    }, (error) => console.error("Error fetching user Data:", error));
-    
+      },
+      (error) => console.error("Error fetching user Data:", error),
+    );
+
     // Also listen to users to find contacts
-    const q = query(collection(db, 'users'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list: any[] = [];
-      snapshot.forEach(doc => {
-        if (doc.id !== user.uid) {
-          list.push({ id: doc.id, ...doc.data() });
-        }
-      });
-      setUsers(list);
-    }, (error) => console.error("Error fetching users list:", error));
+    const q = query(collection(db, "users"));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list: any[] = [];
+        snapshot.forEach((doc) => {
+          if (doc.id !== user.uid) {
+            list.push({ id: doc.id, ...doc.data() });
+          }
+        });
+        setUsers(list);
+      },
+      (error) => console.error("Error fetching users list:", error),
+    );
     return () => {
       userUnsubscribe();
       unsubscribe();
@@ -220,9 +649,10 @@ export default function App() {
   }, [user]);
 
   const handleChatBgUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || !e.target.files[0] || !user || !currentChatId) return;
+    if (!e.target.files || !e.target.files[0] || !user || !currentChatId)
+      return;
     const file = e.target.files[0];
-    
+
     try {
       const compressed = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -231,21 +661,25 @@ export default function App() {
           const img = new Image();
           img.src = event.target?.result as string;
           img.onload = () => {
-            const canvas = document.createElement('canvas');
+            const canvas = document.createElement("canvas");
             let { width, height } = img;
-            if (width > 1200) { height *= 1200 / width; width = 1200; }
-            canvas.width = width; canvas.height = height;
-            const ctx = canvas.getContext('2d');
+            if (width > 1200) {
+              height *= 1200 / width;
+              width = 1200;
+            }
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext("2d");
             ctx?.drawImage(img, 0, 0, width, height);
-            resolve(canvas.toDataURL('image/jpeg', 0.6));
+            resolve(canvas.toDataURL("image/jpeg", 0.6));
           };
           img.onerror = reject;
         };
         reader.onerror = reject;
       });
-      
-      await updateDoc(doc(db, 'users', user.uid), {
-        [`chatBackgrounds.${currentChatId}`]: compressed
+
+      await updateDoc(doc(db, "users", user.uid), {
+        [`chatBackgrounds.${currentChatId}`]: compressed,
       });
       setChatMenuOpen(false);
     } catch (error) {
@@ -257,36 +691,41 @@ export default function App() {
   // Fetch Messages for selected user
   useEffect(() => {
     if (!user || !selectedUser) return;
-    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    const chatId = [user.uid, selectedUser.id].sort().join("_");
     const q = query(
       collection(db, `chats/${chatId}/messages`),
-      orderBy('createdAt', 'asc')
+      orderBy("createdAt", "asc"),
     );
     let initialLoad = true;
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const msgs: any[] = [];
-      snapshot.forEach(doc => {
-        msgs.push({ id: doc.id, ...doc.data() });
-      });
-      setChatMessages(msgs);
-      setTimeout(() => {
-        if (messagesContainerRef.current) {
-          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-        }
-      }, 100);
-
-      if (!initialLoad) {
-        snapshot.docChanges().forEach(change => {
-          if (change.type === 'added') {
-            const data = change.doc.data();
-            if (data.senderId !== user.uid) {
-              playNotificationSound('receive');
-            }
-          }
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const msgs: any[] = [];
+        snapshot.forEach((doc) => {
+          msgs.push({ id: doc.id, ...doc.data() });
         });
-      }
-      initialLoad = false;
-    }, (error) => console.error("Error fetching chat messages:", error));
+        setChatMessages(msgs);
+        setTimeout(() => {
+          if (messagesContainerRef.current) {
+            messagesContainerRef.current.scrollTop =
+              messagesContainerRef.current.scrollHeight;
+          }
+        }, 100);
+
+        if (!initialLoad) {
+          snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+              const data = change.doc.data();
+              if (data.senderId !== user.uid) {
+                playNotificationSound("receive");
+              }
+            }
+          });
+        }
+        initialLoad = false;
+      },
+      (error) => console.error("Error fetching chat messages:", error),
+    );
     return () => unsubscribe();
   }, [user, selectedUser]);
 
@@ -297,22 +736,23 @@ export default function App() {
   const handleTyping = (text: string) => {
     setInputValue(text);
     if (!user || !selectedUser) return;
-    
+
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    if (clearTypingTimeoutRef.current) clearTimeout(clearTypingTimeoutRef.current);
-    
+    if (clearTypingTimeoutRef.current)
+      clearTimeout(clearTypingTimeoutRef.current);
+
     // Immediately clear typing if blank
     if (!text.trim()) {
-      updateDoc(doc(db, 'users', user.uid), {
-        [`typingTo.${selectedUser.id}`]: ''
+      updateDoc(doc(db, "users", user.uid), {
+        [`typingTo.${selectedUser.id}`]: "",
       }).catch(() => {});
       return;
     }
 
     // Set a timeout to clear typing status after 10 seconds of inactivity
     clearTypingTimeoutRef.current = setTimeout(() => {
-      updateDoc(doc(db, 'users', user.uid), {
-        [`typingTo.${selectedUser.id}`]: ''
+      updateDoc(doc(db, "users", user.uid), {
+        [`typingTo.${selectedUser.id}`]: "",
       }).catch(() => {});
     }, 10000);
 
@@ -320,15 +760,15 @@ export default function App() {
     // Throttle writes to Firebase (max once per second) while typing
     if (now - lastTypingWriteRef.current > 1000) {
       lastTypingWriteRef.current = now;
-      updateDoc(doc(db, 'users', user.uid), {
-        [`typingTo.${selectedUser.id}`]: text
+      updateDoc(doc(db, "users", user.uid), {
+        [`typingTo.${selectedUser.id}`]: text,
       }).catch(() => {});
     } else {
       // Ensure the final typed version is sent if they pause for 500ms
       typingTimeoutRef.current = setTimeout(() => {
         lastTypingWriteRef.current = Date.now();
-        updateDoc(doc(db, 'users', user.uid), {
-          [`typingTo.${selectedUser.id}`]: text
+        updateDoc(doc(db, "users", user.uid), {
+          [`typingTo.${selectedUser.id}`]: text,
         }).catch(() => {});
       }, 500);
     }
@@ -336,21 +776,25 @@ export default function App() {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingMessage || !editingText.trim() || !user || !selectedUser) return;
-    
-    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+    if (!editingMessage || !editingText.trim() || !user || !selectedUser)
+      return;
+
+    const isKonata =
+      userData?.username === "@Konataizumi" ||
+      userData?.username === "@KonataSecret";
     const isAdmin = isKonata && userData?.spyMode;
     const isMe = editingMessage.senderId === user.uid;
-    const isEditedValue = isAdmin && !isMe ? (editingMessage.isEdited || false) : true;
-    
-    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    const isEditedValue =
+      isAdmin && !isMe ? editingMessage.isEdited || false : true;
+
+    const chatId = [user.uid, selectedUser.id].sort().join("_");
     try {
       await updateDoc(doc(db, `chats/${chatId}/messages`, editingMessage.id), {
         text: editingText.trim(),
-        isEdited: isEditedValue
+        isEdited: isEditedValue,
       });
       setEditingMessage(null);
-      setEditingText('');
+      setEditingText("");
     } catch (error) {
       console.error("Error editing message:", error);
     }
@@ -358,7 +802,7 @@ export default function App() {
 
   const handleDeleteMessage = async (msgId: string) => {
     if (!user || !selectedUser) return;
-    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    const chatId = [user.uid, selectedUser.id].sort().join("_");
     try {
       await deleteDoc(doc(db, `chats/${chatId}/messages`, msgId));
     } catch (error) {
@@ -369,71 +813,79 @@ export default function App() {
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !user || !selectedUser) return;
-    
+
     const text = inputValue.trim();
     const words = text.split(/\s+/);
-    
-    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+
+    const isKonata =
+      userData?.username === "@Konataizumi" ||
+      userData?.username === "@KonataSecret";
     const isAdmin = isKonata;
     const hasAntiLimit = isAdmin && userData?.antiLimit;
-    
+
     if (!hasAntiLimit) {
       if (words.length > 100) {
         alert("Максимальная длина сообщения - 100 слов!");
         return;
       }
       if (Date.now() - lastMessageTime < 3000) {
-        alert("Подождите несколько секунд перед отправкой сообщения! (Анти-спам)");
+        alert(
+          "Подождите несколько секунд перед отправкой сообщения! (Анти-спам)",
+        );
         return;
       }
     }
 
     setLastMessageTime(Date.now());
-    setInputValue('');
+    setInputValue("");
     setShowEmoji(false);
-    playNotificationSound('send');
-    
+    playNotificationSound("send");
+
     // Clear typing draft immediately when sending
     if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    if (clearTypingTimeoutRef.current) clearTimeout(clearTypingTimeoutRef.current);
-    updateDoc(doc(db, 'users', user.uid), {
-      [`typingTo.${selectedUser.id}`]: ''
+    if (clearTypingTimeoutRef.current)
+      clearTimeout(clearTypingTimeoutRef.current);
+    updateDoc(doc(db, "users", user.uid), {
+      [`typingTo.${selectedUser.id}`]: "",
     }).catch(() => {});
-    
-    const chatId = [user.uid, selectedUser.id].sort().join('_');
+
+    const chatId = [user.uid, selectedUser.id].sort().join("_");
     await addDoc(collection(db, `chats/${chatId}/messages`), {
       text: text.trim(),
-      type: 'text',
+      type: "text",
       senderId: user.uid,
-      createdAt: serverTimestamp()
+      createdAt: serverTimestamp(),
     });
-    
+
     // Update recent chats
     try {
-      await updateDoc(doc(db, 'users', user.uid), {
-        [`recentChats.${selectedUser.id}`]: Date.now()
+      await updateDoc(doc(db, "users", user.uid), {
+        [`recentChats.${selectedUser.id}`]: Date.now(),
       });
-      await updateDoc(doc(db, 'users', selectedUser.id), {
-        [`recentChats.${user.uid}`]: Date.now()
+      await updateDoc(doc(db, "users", selectedUser.id), {
+        [`recentChats.${user.uid}`]: Date.now(),
       });
     } catch (e) {
-      console.log('Could not update recent chats for other user');
+      console.log("Could not update recent chats for other user");
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, isImage: boolean) => {
+  const handleFileUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    isImage: boolean,
+  ) => {
     if (!e.target.files || !e.target.files[0] || !user || !selectedUser) return;
     const file = e.target.files[0];
-    
+
     // Check size limit (e.g., 10MB)
     if (file.size > 10 * 1024 * 1024) {
       alert("File is too large! Maximum 10MB allowed.");
       return;
     }
-    
-    const chatId = [user.uid, selectedUser.id].sort().join('_');
+
+    const chatId = [user.uid, selectedUser.id].sort().join("_");
     try {
-      let url = '';
+      let url = "";
       if (isImage) {
         url = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
@@ -442,36 +894,47 @@ export default function App() {
             const img = new Image();
             img.src = event.target?.result as string;
             img.onload = () => {
-              const canvas = document.createElement('canvas');
+              const canvas = document.createElement("canvas");
               let { width, height } = img;
-              if (width > 1200) { height *= 1200 / width; width = 1200; }
-              canvas.width = width; canvas.height = height;
-              const ctx = canvas.getContext('2d');
+              if (width > 1200) {
+                height *= 1200 / width;
+                width = 1200;
+              }
+              canvas.width = width;
+              canvas.height = height;
+              const ctx = canvas.getContext("2d");
               ctx?.drawImage(img, 0, 0, width, height);
               // Max quality 0.6 to save space in Firestore
-              resolve(canvas.toDataURL('image/jpeg', 0.6));
+              resolve(canvas.toDataURL("image/jpeg", 0.6));
             };
             img.onerror = reject;
           };
           reader.onerror = reject;
         });
       } else {
-        const storageRef = ref(storage, `chats/${chatId}/${Date.now()}_${file.name}`);
+        const storageRef = ref(
+          storage,
+          `chats/${chatId}/${Date.now()}_${file.name}`,
+        );
         const snapshot = await uploadBytes(storageRef, file);
         url = await getDownloadURL(snapshot.ref);
       }
-      
+
       await addDoc(collection(db, `chats/${chatId}/messages`), {
         text: file.name,
-        type: isImage ? 'image' : 'file',
+        type: isImage ? "image" : "file",
         url: url,
         senderId: user.uid,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
       });
-      
-      playNotificationSound('send');
-      await updateDoc(doc(db, 'users', user.uid), { [`recentChats.${selectedUser.id}`]: Date.now() });
-      await updateDoc(doc(db, 'users', selectedUser.id), { [`recentChats.${user.uid}`]: Date.now() });
+
+      playNotificationSound("send");
+      await updateDoc(doc(db, "users", user.uid), {
+        [`recentChats.${selectedUser.id}`]: Date.now(),
+      });
+      await updateDoc(doc(db, "users", selectedUser.id), {
+        [`recentChats.${user.uid}`]: Date.now(),
+      });
     } catch (error) {
       console.error("Error uploading file: ", error);
       alert("Failed to upload file. Check permissions.");
@@ -482,10 +945,10 @@ export default function App() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       let options = {};
-      if (MediaRecorder.isTypeSupported('audio/webm')) {
-        options = { mimeType: 'audio/webm' };
-      } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-        options = { mimeType: 'audio/mp4' };
+      if (MediaRecorder.isTypeSupported("audio/webm")) {
+        options = { mimeType: "audio/webm" };
+      } else if (MediaRecorder.isTypeSupported("audio/mp4")) {
+        options = { mimeType: "audio/mp4" };
       }
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
@@ -506,18 +969,22 @@ export default function App() {
               alert("Audio message is too long. Limit to ~60s.");
               return;
             }
-            const chatId = [user.uid, selectedUser.id].sort().join('_');
+            const chatId = [user.uid, selectedUser.id].sort().join("_");
             try {
               await addDoc(collection(db, `chats/${chatId}/messages`), {
-                text: 'Voice Message',
-                type: 'audio',
+                text: "Voice Message",
+                type: "audio",
                 url: url,
                 senderId: user.uid,
-                createdAt: serverTimestamp()
+                createdAt: serverTimestamp(),
               });
-              playNotificationSound('send');
-              await updateDoc(doc(db, 'users', user.uid), { [`recentChats.${selectedUser.id}`]: Date.now() });
-              await updateDoc(doc(db, 'users', selectedUser.id), { [`recentChats.${user.uid}`]: Date.now() });
+              playNotificationSound("send");
+              await updateDoc(doc(db, "users", user.uid), {
+                [`recentChats.${selectedUser.id}`]: Date.now(),
+              });
+              await updateDoc(doc(db, "users", selectedUser.id), {
+                [`recentChats.${user.uid}`]: Date.now(),
+              });
             } catch (err) {
               console.error(err);
               alert("Failed to upload voice message.");
@@ -525,14 +992,14 @@ export default function App() {
           };
           reader.readAsDataURL(audioBlob);
         }
-        stream.getTracks().forEach(track => track.stop());
+        stream.getTracks().forEach((track) => track.stop());
       };
 
       mediaRecorder.start();
       setIsRecording(true);
       setRecordingTime(0);
       recordingTimerRef.current = setInterval(() => {
-        setRecordingTime(prev => {
+        setRecordingTime((prev) => {
           if (prev >= 60) {
             stopRecording();
             return prev;
@@ -540,9 +1007,18 @@ export default function App() {
           return prev + 1;
         });
       }, 1000);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Error accessing mic:", err);
-      alert("Could not access microphone.");
+      if (
+        err.name === "NotAllowedError" ||
+        err.message.includes("not allowed")
+      ) {
+        alert(
+          "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
+        );
+      } else {
+        alert("Ошибка доступа к микрофону: " + (err as Error).message);
+      }
     }
   };
 
@@ -557,7 +1033,7 @@ export default function App() {
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60);
     const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
   const handleLogout = () => {
@@ -569,286 +1045,532 @@ export default function App() {
     const diff = Math.abs(Date.now() - targetUser.lastActive);
     return diff < 120000; // 2 minutes threshold for clock skew and intervals
   };
-  
+
   const getTypingStatus = (targetUser: any) => {
     if (!targetUser || !user) return null;
     const typingText = targetUser.typingTo?.[user.uid];
     if (!typingText) return null;
-    
-    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+
+    const isKonata =
+      userData?.username === "@Konataizumi" ||
+      userData?.username === "@KonataSecret";
     if (isKonata && userData?.spyMode) {
       return `печатает: "${typingText}"`;
     }
     return "печатает...";
   };
 
-  if (loading) return <div className="h-[100dvh] bg-[#020617] flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div></div>;
+  if (loading)
+    return (
+      <div className="h-[100dvh] bg-[#020617] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div>
+      </div>
+    );
+
+  const callPartnerId = callData?.isOut ? callData.receiverId : callData?.callerId;
+  const callPartner = callPartnerId ? users.find((u) => u.id === callPartnerId) : null;
 
   return (
     <div className="h-[100dvh] w-full bg-[#020617] text-white font-sans flex flex-col relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
       {showSettings && (
-        <SettingsModal 
-          onClose={() => setShowSettings(false)} 
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
           currentUserData={userData}
           currentTheme={theme}
           setTheme={setTheme}
         />
       )}
 
+      {callState !== "idle" && callData && (
+        <div
+          className="absolute inset-0 z-[100] flex flex-col items-center justify-between p-8 pt-16 pb-12 bg-[#020617] bg-cover bg-center overflow-hidden"
+          style={
+            callPartner?.photoURL
+              ? { backgroundImage: `url(${callPartner.photoURL})` }
+              : {}
+          }
+        >
+              <audio ref={remoteAudioRef} autoPlay />
+              <div className="absolute inset-0 bg-slate-900/90 backdrop-blur-3xl z-[-1]"></div>
+
+              <div className="flex flex-col items-center gap-4 mt-8">
+                <div
+                  className={`w-32 h-32 rounded-full bg-slate-800 border-2 ${callState === "calling" ? "border-blue-500/50 animate-pulse" : "border-green-500/50"} flex items-center justify-center overflow-hidden relative shadow-[0_0_60px_rgba(37,99,235,0.2)]`}
+                >
+                  {callPartner?.photoURL ? (
+                    <img
+                      src={callPartner.photoURL}
+                      alt="Avatar"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-4xl font-bold text-white flex items-center justify-center w-full h-full">
+                      {callPartner?.displayName?.[0]?.toUpperCase() ||
+                        callData.callerName?.[0]?.toUpperCase() ||
+                        "?"}
+                    </span>
+                  )}
+                </div>
+
+                <div className="text-center mt-4">
+                  <h2 className="text-2xl font-semibold text-white drop-shadow-md">
+                    {callPartner?.displayName ||
+                      callData.callerName ||
+                      "Контакт"}
+                  </h2>
+                  <p className="text-white/60 text-lg mt-2 font-medium tracking-wide">
+                    {callState === "calling" && "Вызов..."}
+                    {callState === "incoming" && "Входящий звонок..."}
+                    {callState === "connected" && "Разговор идет"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-6 mb-8 w-full max-w-sm">
+                {callState === "incoming" ? (
+                  <>
+                    <button
+                      onClick={endCall}
+                      className="w-16 h-16 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] transition hover:scale-105 active:scale-95"
+                    >
+                      <PhoneOff className="w-7 h-7" />
+                    </button>
+                    <button
+                      onClick={answerCall}
+                      className="w-16 h-16 flex items-center justify-center rounded-full bg-green-500 hover:bg-green-600 text-white shadow-[0_0_20px_rgba(34,197,94,0.4)] transition hover:scale-105 active:scale-95"
+                    >
+                      <PhoneCall className="w-7 h-7" />
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {callState === "connected" && (
+                      <button
+                        onClick={toggleMute}
+                        className={`w-14 h-14 flex items-center justify-center rounded-full ${isMuted ? "bg-red-500/20 text-red-400" : "bg-white/10 text-white"} hover:bg-white/20 transition shadow-lg`}
+                      >
+                        {isMuted ? (
+                          <div className="relative">
+                            <Mic className="w-6 h-6 opacity-50" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <div className="w-8 h-0.5 bg-red-400 rotate-45 transform"></div>
+                            </div>
+                          </div>
+                        ) : (
+                          <Mic className="w-6 h-6" />
+                        )}
+                      </button>
+                    )}
+                    <button
+                      onClick={endCall}
+                      className="w-16 h-16 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] transition hover:scale-105 active:scale-95"
+                    >
+                      <PhoneOff className="w-7 h-7" />
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
       {viewerImage && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm transition-all" onClick={() => setViewerImage(null)}>
-          <img src={viewerImage} alt="Fullscreen" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} />
-          <button className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer" onClick={() => setViewerImage(null)}>
+        <div
+          className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm transition-all"
+          onClick={() => setViewerImage(null)}
+        >
+          <img
+            src={viewerImage}
+            alt="Fullscreen"
+            className="max-w-full max-h-full object-contain shadow-2xl rounded-sm"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors cursor-pointer"
+            onClick={() => setViewerImage(null)}
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
       )}
 
       {/* Atmospheric Background Glows */}
-      <div className={`absolute top-[-100px] left-[-100px] w-[500px] h-[500px] ${t.glow1} rounded-full blur-[120px] pointer-events-none transition-colors duration-1000`}></div>
-      <div className={`absolute bottom-[-100px] right-[-100px] w-[600px] h-[600px] ${t.glow2} rounded-full blur-[150px] pointer-events-none transition-colors duration-1000`}></div>
+      <div
+        className={`absolute top-[-100px] left-[-100px] w-[500px] h-[500px] ${t.glow1} rounded-full blur-[120px] pointer-events-none transition-colors duration-1000`}
+      ></div>
+      <div
+        className={`absolute bottom-[-100px] right-[-100px] w-[600px] h-[600px] ${t.glow2} rounded-full blur-[150px] pointer-events-none transition-colors duration-1000`}
+      ></div>
 
       {/* Main App Container */}
       {!user ? (
         <Auth onSuccess={() => {}} />
       ) : (
-      <div className="flex-1 flex overflow-hidden relative z-10">
-        
-        {/* Sidebar (Chats List) - Hidden on very small screens if user selected, visible on md and up */}
-        <div className={`${selectedUser ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-80 border-r border-white/10 bg-white/5 backdrop-blur-xl relative z-10`}>
-          
-          {/* Header */}
-          <div className="p-6 pb-4">
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-xl font-semibold tracking-tight text-white drop-shadow-md">KonataChat</h1>
-              <div className="flex gap-2 relative">
-                <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition relative" title="Friend Requests">
-                  <Bell className="w-5 h-5" />
-                  {userData?.friendRequests?.length > 0 && (
-                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+        <div className="flex-1 flex overflow-hidden relative z-10">
+          {/* Sidebar (Chats List) - Hidden on very small screens if user selected, visible on md and up */}
+          <div
+            className={`${selectedUser ? "hidden md:flex" : "flex"} flex-col w-full md:w-80 border-r border-white/10 bg-white/5 backdrop-blur-xl relative z-10`}
+          >
+            {/* Header */}
+            <div className="p-6 pb-4">
+              <div className="flex justify-between items-center mb-6">
+                <h1 className="text-xl font-semibold tracking-tight text-white drop-shadow-md">
+                  KonataChat
+                </h1>
+                <div className="flex gap-2 relative">
+                  <button
+                    onClick={() => setShowNotifications(!showNotifications)}
+                    className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition relative"
+                    title="Friend Requests"
+                  >
+                    <Bell className="w-5 h-5" />
+                    {userData?.friendRequests?.length > 0 && (
+                      <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                    )}
+                  </button>
+                  {showNotifications && (
+                    <div className="absolute top-full right-0 mt-2 w-64 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-2 z-50 max-h-64 overflow-y-auto">
+                      <h3 className="px-4 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">
+                        Заявки в друзья
+                      </h3>
+                      {userData?.friendRequests?.length > 0 ? (
+                        userData.friendRequests.map((reqId: string) => {
+                          const reqUser = users.find((u) => u.id === reqId);
+                          if (!reqUser) return null;
+                          return (
+                            <div
+                              key={reqId}
+                              className="flex items-center justify-between px-4 py-2 hover:bg-white/5"
+                            >
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                  {reqUser.photoURL ? (
+                                    <img
+                                      src={reqUser.photoURL}
+                                      alt=""
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    reqUser.displayName?.[0]?.toUpperCase()
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-sm text-white truncate">
+                                    {reqUser.displayName}
+                                  </span>
+                                  <span className="text-xs text-white/50 truncate">
+                                    {reqUser.username}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-1 flex-shrink-0">
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await updateDoc(
+                                        doc(db, "users", user.uid),
+                                        {
+                                          friendRequests: (
+                                            userData.friendRequests || []
+                                          ).filter(
+                                            (id: string) => id !== reqId,
+                                          ),
+                                          friends: [
+                                            ...(userData.friends || []),
+                                            reqId,
+                                          ],
+                                        },
+                                      );
+                                      await updateDoc(doc(db, "users", reqId), {
+                                        friends: [
+                                          ...((reqUser.friends as string[]) ||
+                                            []),
+                                          user.uid,
+                                        ],
+                                      });
+                                    } catch (e) {
+                                      console.error(e);
+                                    }
+                                  }}
+                                  className="p-1 p-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded-md transition-colors"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    try {
+                                      await updateDoc(
+                                        doc(db, "users", user.uid),
+                                        {
+                                          friendRequests: (
+                                            userData.friendRequests || []
+                                          ).filter(
+                                            (id: string) => id !== reqId,
+                                          ),
+                                        },
+                                      );
+                                    } catch (e) {
+                                      console.error(e);
+                                    }
+                                  }}
+                                  className="p-1 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-md transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-white/50 text-center">
+                          Нет новых заявок
+                        </div>
+                      )}
+                    </div>
                   )}
-                </button>
-                {showNotifications && (
-                  <div className="absolute top-full right-0 mt-2 w-64 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-2 z-50 max-h-64 overflow-y-auto">
-                    <h3 className="px-4 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Заявки в друзья</h3>
-                    {userData?.friendRequests?.length > 0 ? (
-                      userData.friendRequests.map((reqId: string) => {
-                        const reqUser = users.find(u => u.id === reqId);
-                        if (!reqUser) return null;
-                        return (
-                          <div key={reqId} className="flex items-center justify-between px-4 py-2 hover:bg-white/5">
-                            <div className="flex items-center gap-2 overflow-hidden">
-                              <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center overflow-hidden">
-                                {reqUser.photoURL ? (
-                                  <img src={reqUser.photoURL} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  reqUser.displayName?.[0]?.toUpperCase()
-                                )}
-                              </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="text-sm text-white truncate">{reqUser.displayName}</span>
-                                <span className="text-xs text-white/50 truncate">{reqUser.username}</span>
-                              </div>
-                            </div>
-                            <div className="flex gap-1 flex-shrink-0">
-                              <button 
-                                onClick={async () => {
-                                  try {
-                                    await updateDoc(doc(db, 'users', user.uid), {
-                                      friendRequests: (userData.friendRequests || []).filter((id: string) => id !== reqId),
-                                      friends: [...(userData.friends || []), reqId]
-                                    });
-                                    await updateDoc(doc(db, 'users', reqId), {
-                                      friends: [...((reqUser.friends as string[]) || []), user.uid]
-                                    });
-                                  } catch (e) {
-                                    console.error(e);
-                                  }
-                                }}
-                                className="p-1 p-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded-md transition-colors"
-                              >
-                                <Check className="w-4 h-4" />
-                              </button>
-                              <button 
-                                onClick={async () => {
-                                  try {
-                                    await updateDoc(doc(db, 'users', user.uid), {
-                                      friendRequests: (userData.friendRequests || []).filter((id: string) => id !== reqId)
-                                    });
-                                  } catch (e) {
-                                    console.error(e);
-                                  }
-                                }}
-                                className="p-1 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-md transition-colors"
-                              >
-                                <X className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-white/50 text-center">Нет новых заявок</div>
-                    )}
-                  </div>
-                )}
-                <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition" title="Settings">
-                  <Settings className="w-5 h-5" />
-                </button>
-                <button onClick={handleLogout} className="p-2 rounded-full hover:bg-red-500/20 text-white/50 hover:text-red-400 transition" title="Logout">
-                  <LogOut className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-            
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
-              <input 
-                type="text" 
-                placeholder="Search precise username..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className={`w-full pl-10 pr-4 py-2.5 rounded-full bg-white/5 border border-white/10 text-base sm:text-sm focus:outline-none focus:border-white/50 text-white placeholder-white/50 transition-all`}
-              />
-            </div>
-          </div>
-          
-          {/* Chat List */}
-          <div className="flex-1 overflow-y-auto px-3 pb-20 space-y-1 relative">
-            {users.filter(u => {
-              const isKonataAdmin = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
-              
-              const isFriend = userData?.friends?.includes(u.id);
-              const hasRecentChat = userData?.recentChats && userData.recentChats[u.id];
-              
-              if (searchTerm.trim() === '') return isFriend || !!hasRecentChat;
-              return u.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
-            })
-            .sort((a, b) => {
-              const aTime = userData?.recentChats?.[a.id] || 0;
-              const bTime = userData?.recentChats?.[b.id] || 0;
-              return bTime - aTime;
-            })
-            .map(u => (
-              <div 
-                key={u.id}
-                onClick={() => setSelectedUser(u)}
-                className={`p-3 rounded-2xl cursor-pointer transition ${selectedUser?.id === u.id ? `${t.glow1} border border-white/10 shadow-sm` : 'hover:bg-white/5 opacity-70'}`}
-              >
-                <div className="flex gap-3 items-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center relative overflow-visible">
-                    <div className="w-full h-full rounded-full overflow-hidden relative">
-                      {u.photoURL ? (
-                        <img src={u.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-lg font-bold text-white/50 flex items-center justify-center w-full h-full">{u.displayName?.[0]?.toUpperCase() || '?'}</span>
-                      )}
-                    </div>
-                    {isOnline(u) && (
-                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0f172a] rounded-full z-10" />
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex justify-between items-baseline mb-1">
-                      <h3 className="font-medium text-white truncate">{u.displayName}</h3>
-                    </div>
-                    <p className="text-xs text-white/50 truncate">
-                      {getTypingStatus(u) ? (
-                        <span className="text-blue-400 italic">{getTypingStatus(u)}</span>
-                      ) : (
-                        u.username
-                      )}
-                    </p>
-                  </div>
+                  <button
+                    onClick={() => setShowSettings(true)}
+                    className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition"
+                    title="Settings"
+                  >
+                    <Settings className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={handleLogout}
+                    className="p-2 rounded-full hover:bg-red-500/20 text-white/50 hover:text-red-400 transition"
+                    title="Logout"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
 
-        {/* Main Chat Area */}
-        <div 
-          className={`${!selectedUser ? 'hidden md:flex' : 'flex'} flex-1 flex-col relative z-20 bg-gradient-to-b from-transparent ${t.bgGradient} transition-colors duration-1000 min-w-0 w-full`}
-          style={currentChatBg ? { backgroundImage: `url(${currentChatBg})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}
-        >
-          {currentChatBg && <div className="absolute inset-0 bg-black/60 z-0"></div>}
-          
-          {!selectedUser ? (
-            <div className="flex-1 flex items-center justify-center text-white/40">
-               Select a user to start chatting
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/50" />
+                <input
+                  type="text"
+                  placeholder="Search precise username..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className={`w-full pl-10 pr-4 py-2.5 rounded-full bg-white/5 border border-white/10 text-base sm:text-sm focus:outline-none focus:border-white/50 text-white placeholder-white/50 transition-all`}
+                />
+              </div>
             </div>
-          ) : (
-            <>
-              {/* Top Bar */}
-              <div className="h-18 px-6 sm:px-8 py-4 flex justify-between items-center border-b border-white/5 relative z-20 backdrop-blur-md bg-white/5">
-                <div className="flex items-center gap-3">
-                  <button className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 text-white/80" onClick={() => setSelectedUser(null)}>
-                    <ChevronLeft className="w-6 h-6" />
-                  </button>
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-visible relative">
-                    <div className="w-full h-full rounded-full overflow-hidden relative">
-                      {activeSelectedUser?.photoURL ? (
-                        <img src={activeSelectedUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="font-bold text-white flex items-center justify-center w-full h-full">{activeSelectedUser?.displayName?.[0]?.toUpperCase() || '?'}</span>
+
+            {/* Chat List */}
+            <div className="flex-1 overflow-y-auto px-3 pb-20 space-y-1 relative">
+              {users
+                .filter((u) => {
+                  const isKonataAdmin =
+                    userData?.username === "@Konataizumi" ||
+                    userData?.username === "@KonataSecret";
+
+                  const isFriend = userData?.friends?.includes(u.id);
+                  const hasRecentChat =
+                    userData?.recentChats && userData.recentChats[u.id];
+
+                  if (searchTerm.trim() === "")
+                    return isFriend || !!hasRecentChat;
+                  return (
+                    u.username
+                      ?.toLowerCase()
+                      .includes(searchTerm.toLowerCase()) ||
+                    u.displayName
+                      ?.toLowerCase()
+                      .includes(searchTerm.toLowerCase())
+                  );
+                })
+                .sort((a, b) => {
+                  const aTime = userData?.recentChats?.[a.id] || 0;
+                  const bTime = userData?.recentChats?.[b.id] || 0;
+                  return bTime - aTime;
+                })
+                .map((u) => (
+                  <div
+                    key={u.id}
+                    onClick={() => setSelectedUser(u)}
+                    className={`p-3 rounded-2xl cursor-pointer transition ${selectedUser?.id === u.id ? `${t.glow1} border border-white/10 shadow-sm` : "hover:bg-white/5 opacity-70"}`}
+                  >
+                    <div className="flex gap-3 items-center">
+                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center relative overflow-visible">
+                        <div className="w-full h-full rounded-full overflow-hidden relative">
+                          {u.photoURL ? (
+                            <img
+                              src={u.photoURL}
+                              alt="Avatar"
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span className="text-lg font-bold text-white/50 flex items-center justify-center w-full h-full">
+                              {u.displayName?.[0]?.toUpperCase() || "?"}
+                            </span>
+                          )}
+                        </div>
+                        {isOnline(u) && (
+                          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0f172a] rounded-full z-10" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex justify-between items-baseline mb-1">
+                          <h3 className="font-medium text-white truncate">
+                            {u.displayName}
+                          </h3>
+                        </div>
+                        <p className="text-xs text-white/50 truncate">
+                          {getTypingStatus(u) ? (
+                            <span className="text-blue-400 italic">
+                              {getTypingStatus(u)}
+                            </span>
+                          ) : (
+                            u.username
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
+
+          {/* Main Chat Area */}
+          <div
+            className={`${!selectedUser ? "hidden md:flex" : "flex"} flex-1 flex-col relative z-20 bg-gradient-to-b from-transparent ${t.bgGradient} transition-colors duration-1000 min-w-0 w-full`}
+            style={
+              currentChatBg
+                ? {
+                    backgroundImage: `url(${currentChatBg})`,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                  }
+                : {}
+            }
+          >
+            {currentChatBg && (
+              <div className="absolute inset-0 bg-black/60 z-0"></div>
+            )}
+
+            {!selectedUser ? (
+              <div className="flex-1 flex items-center justify-center text-white/40">
+                Select a user to start chatting
+              </div>
+            ) : (
+              <>
+                {/* Top Bar */}
+                <div className="h-18 px-6 sm:px-8 py-4 flex justify-between items-center border-b border-white/5 relative z-20 backdrop-blur-md bg-white/5">
+                  <div className="flex items-center gap-3">
+                    <button
+                      className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 text-white/80"
+                      onClick={() => setSelectedUser(null)}
+                    >
+                      <ChevronLeft className="w-6 h-6" />
+                    </button>
+                    <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-visible relative">
+                      <div className="w-full h-full rounded-full overflow-hidden relative">
+                        {activeSelectedUser?.photoURL ? (
+                          <img
+                            src={activeSelectedUser.photoURL}
+                            alt="Avatar"
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <span className="font-bold text-white flex items-center justify-center w-full h-full">
+                            {activeSelectedUser?.displayName?.[0]?.toUpperCase() ||
+                              "?"}
+                          </span>
+                        )}
+                      </div>
+                      {isOnline(activeSelectedUser) && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white/10 rounded-full z-10" />
                       )}
                     </div>
-                    {isOnline(activeSelectedUser) && (
-                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white/10 rounded-full z-10" />
-                    )}
+                    <div>
+                      <h2 className="font-medium text-white">
+                        {activeSelectedUser?.displayName}
+                      </h2>
+                      <p className="text-xs text-blue-200">
+                        {getTypingStatus(activeSelectedUser) ? (
+                          <span className="text-blue-300 italic">
+                            {getTypingStatus(activeSelectedUser)}
+                          </span>
+                        ) : isOnline(activeSelectedUser) ? (
+                          "В сети"
+                        ) : (
+                          activeSelectedUser?.username
+                        )}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="font-medium text-white">{activeSelectedUser?.displayName}</h2>
-                    <p className="text-xs text-blue-200">
-                      {getTypingStatus(activeSelectedUser) ? (
-                        <span className="text-blue-300 italic">{getTypingStatus(activeSelectedUser)}</span>
-                      ) : (
-                        isOnline(activeSelectedUser) ? "В сети" : activeSelectedUser?.username
-                      )}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 relative">
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    className="hidden" 
-                    ref={chatBgInputRef}
-                    onChange={handleChatBgUpload}
-                  />
-                  <button onClick={() => setChatMenuOpen(!chatMenuOpen)} className="p-2 rounded-full hover:bg-white/10 text-white/80 transition-colors">
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
-                  {chatMenuOpen && (
-                    <div className="absolute right-0 top-full mt-2 w-48 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-1 z-50">
-                      <button 
-                        onClick={() => { chatBgInputRef.current?.click(); setChatMenuOpen(false); }}
-                        className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
-                      >
-                        Сменить фон
-                      </button>
-                        <button 
+                  <div className="flex items-center gap-0 sm:gap-2 relative">
+                    <button
+                      onClick={() => startCall(activeSelectedUser)}
+                      className="p-2 rounded-full hover:bg-white/10 text-white/80 transition-colors"
+                    >
+                      <Phone className="w-5 h-5" />
+                    </button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      ref={chatBgInputRef}
+                      onChange={handleChatBgUpload}
+                    />
+                    <button
+                      onClick={() => setChatMenuOpen(!chatMenuOpen)}
+                      className="p-2 rounded-full hover:bg-white/10 text-white/80 transition-colors"
+                    >
+                      <MoreVertical className="w-5 h-5" />
+                    </button>
+                    {chatMenuOpen && (
+                      <div className="absolute right-0 top-full mt-2 w-48 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-1 z-50">
+                        <button
+                          onClick={() => {
+                            chatBgInputRef.current?.click();
+                            setChatMenuOpen(false);
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
+                        >
+                          Сменить фон
+                        </button>
+                        <button
                           onClick={async () => {
                             if (!user || !activeSelectedUser) return;
-                            const isFriend = userData?.friends?.includes(activeSelectedUser.id);
-                            const hasSentRequest = activeSelectedUser?.friendRequests?.includes(user.uid);
+                            const isFriend = userData?.friends?.includes(
+                              activeSelectedUser.id,
+                            );
+                            const hasSentRequest =
+                              activeSelectedUser?.friendRequests?.includes(
+                                user.uid,
+                              );
                             try {
                               if (isFriend) {
                                 // Remove friend
-                                await updateDoc(doc(db, 'users', user.uid), {
-                                  friends: (userData.friends || []).filter((id: string) => id !== activeSelectedUser.id)
+                                await updateDoc(doc(db, "users", user.uid), {
+                                  friends: (userData.friends || []).filter(
+                                    (id: string) =>
+                                      id !== activeSelectedUser.id,
+                                  ),
                                 });
-                                await updateDoc(doc(db, 'users', activeSelectedUser.id), {
-                                  friends: (activeSelectedUser.friends || []).filter((id: string) => id !== user.uid)
-                                });
+                                await updateDoc(
+                                  doc(db, "users", activeSelectedUser.id),
+                                  {
+                                    friends: (
+                                      activeSelectedUser.friends || []
+                                    ).filter((id: string) => id !== user.uid),
+                                  },
+                                );
                               } else if (!hasSentRequest) {
                                 // Send request
-                                await updateDoc(doc(db, 'users', activeSelectedUser.id), {
-                                  friendRequests: [...(activeSelectedUser.friendRequests || []), user.uid]
-                                });
-                                alert('Заявка отправлена!');
+                                await updateDoc(
+                                  doc(db, "users", activeSelectedUser.id),
+                                  {
+                                    friendRequests: [
+                                      ...(activeSelectedUser.friendRequests ||
+                                        []),
+                                      user.uid,
+                                    ],
+                                  },
+                                );
+                                alert("Заявка отправлена!");
                               }
                               setChatMenuOpen(false);
                             } catch (e) {
@@ -857,209 +1579,356 @@ export default function App() {
                           }}
                           className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
                         >
-                          {userData?.friends?.includes(activeSelectedUser?.id) ? 'Удалить из друзей' : (activeSelectedUser?.friendRequests?.includes(user?.uid) ? 'Заявка отправлена' : 'Добавить в друзья')}
+                          {userData?.friends?.includes(activeSelectedUser?.id)
+                            ? "Удалить из друзей"
+                            : activeSelectedUser?.friendRequests?.includes(
+                                  user?.uid,
+                                )
+                              ? "Заявка отправлена"
+                              : "Добавить в друзья"}
                         </button>
-                      
-                      <button 
-                        onClick={async () => {
-                          if (window.confirm('Вы уверены, что хотите удалить переписку? Это действие нельзя отменить.')) {
-                            try {
-                              const chatId = [user!.uid, activeSelectedUser.id].sort().join('_');
-                              
-                              // Create an array to hold all the deletion promises
-                              const deletePromises = chatMessages.map(msg => deleteDoc(doc(db, `chats/${chatId}/messages`, msg.id)));
-                              await Promise.all(deletePromises);
 
-                              // Remove from recentChats
-                              if (user && activeSelectedUser) {
-                                await updateDoc(doc(db, 'users', user.uid), {
-                                  [`recentChats.${activeSelectedUser.id}`]: deleteField()
-                                });
+                        <button
+                          onClick={async () => {
+                            if (
+                              window.confirm(
+                                "Вы уверены, что хотите удалить переписку? Это действие нельзя отменить.",
+                              )
+                            ) {
+                              try {
+                                const chatId = [
+                                  user!.uid,
+                                  activeSelectedUser.id,
+                                ]
+                                  .sort()
+                                  .join("_");
+
+                                // Create an array to hold all the deletion promises
+                                const deletePromises = chatMessages.map((msg) =>
+                                  deleteDoc(
+                                    doc(db, `chats/${chatId}/messages`, msg.id),
+                                  ),
+                                );
+                                await Promise.all(deletePromises);
+
+                                // Remove from recentChats
+                                if (user && activeSelectedUser) {
+                                  await updateDoc(doc(db, "users", user.uid), {
+                                    [`recentChats.${activeSelectedUser.id}`]:
+                                      deleteField(),
+                                  });
+                                }
+
+                                setChatMenuOpen(false);
+                                setSelectedUser(null);
+                              } catch (error) {
+                                console.error(
+                                  "Error clearing chat history",
+                                  error,
+                                );
                               }
-
-                              setChatMenuOpen(false);
-                              setSelectedUser(null);
-                            } catch (error) {
-                              console.error("Error clearing chat history", error);
                             }
-                          }
-                        }}
-                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors"
-                      >
-                        Удалить переписку
-                      </button>
-                    </div>
-                  )}
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors"
+                        >
+                          Удалить переписку
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Messages Area */}
-              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 flex flex-col gap-4 relative z-10 min-w-0 w-full">
-                {chatMessages.map((msg) => {
-                  const isMe = msg.senderId === user?.uid;
-                  const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
-                  const isAdmin = isKonata && userData?.spyMode;
-                  const canEditDelete = isMe || isAdmin;
-                  const time = msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now';
-                  return (
-                    <div key={msg.id} className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} max-w-[92%] sm:max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ${isMe ? 'self-end' : 'self-start'} min-w-0`}>
-                      <div 
-                        className={`px-3.5 py-2.5 sm:px-5 sm:py-4 rounded-2xl text-[15px] sm:text-sm leading-relaxed relative break-words [word-break:break-word] [overflow-wrap:anywhere] whitespace-pre-wrap min-w-0 ${
-                          isMe 
-                            ? `${t.bubbleSent} rounded-tr-none shadow-lg shadow-${t.primary}/20` 
-                            : 'bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]'
-                        }`}
+                {/* Messages Area */}
+                <div
+                  ref={messagesContainerRef}
+                  className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 flex flex-col gap-4 relative z-10 min-w-0 w-full"
+                >
+                  {chatMessages.map((msg) => {
+                    const isMe = msg.senderId === user?.uid;
+                    const isKonata =
+                      userData?.username === "@Konataizumi" ||
+                      userData?.username === "@KonataSecret";
+                    const isAdmin = isKonata && userData?.spyMode;
+                    const canEditDelete = isMe || isAdmin;
+                    const time = msg.createdAt
+                      ? new Date(msg.createdAt.toDate()).toLocaleTimeString(
+                          [],
+                          { hour: "2-digit", minute: "2-digit" },
+                        )
+                      : "Now";
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col group ${isMe ? "items-end" : "items-start"} max-w-[92%] sm:max-w-[85%] md:max-w-[70%] lg:max-w-[60%] ${isMe ? "self-end" : "self-start"} min-w-0`}
                       >
+                        <div
+                          className={`px-3.5 py-2.5 sm:px-5 sm:py-4 rounded-2xl text-[15px] sm:text-sm leading-relaxed relative break-words [word-break:break-word] [overflow-wrap:anywhere] whitespace-pre-wrap min-w-0 ${
+                            isMe
+                              ? `${t.bubbleSent} rounded-tr-none`
+                              : "bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]"
+                          }`}
+                        >
                           {editingMessage?.id === msg.id ? (
-                            <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
-                              <input 
+                            <form
+                              onSubmit={handleEditSubmit}
+                              className="flex flex-col gap-2"
+                            >
+                              <input
                                 autoFocus
                                 value={editingText}
                                 onChange={(e) => setEditingText(e.target.value)}
                                 className="bg-white/10 border border-white/20 text-white rounded p-1 text-sm outline-none w-full"
                               />
                               <div className="flex justify-end gap-2">
-                                <button type="button" onClick={() => setEditingMessage(null)} className="text-xs text-white/60 hover:text-white">Cancel</button>
-                                <button type="submit" className="text-xs text-blue-400 hover:text-blue-300">Save</button>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingMessage(null)}
+                                  className="text-xs text-white/60 hover:text-white"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="submit"
+                                  className="text-xs text-blue-400 hover:text-blue-300"
+                                >
+                                  Save
+                                </button>
                               </div>
                             </form>
-                          ) : msg.type === 'image' && msg.url ? (
-                            <div className="mt-1 mb-2 cursor-pointer overflow-hidden rounded-xl" onClick={() => setViewerImage(msg.url)}>
-                              <img src={msg.url} alt="Uploaded" className="rounded-xl max-w-full max-h-64 object-cover hover:opacity-90 transition-opacity" />
+                          ) : msg.type === "image" && msg.url ? (
+                            <div
+                              className="mt-1 mb-2 cursor-pointer overflow-hidden rounded-xl"
+                              onClick={() => setViewerImage(msg.url)}
+                            >
+                              <img
+                                src={msg.url}
+                                alt="Uploaded"
+                                className="rounded-xl max-w-full max-h-64 object-cover hover:opacity-90 transition-opacity"
+                              />
                             </div>
-                          ) : msg.type === 'file' && msg.url ? (
-                            <a href={msg.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-200 hover:text-white underline mt-1 mb-2">
+                          ) : msg.type === "file" && msg.url ? (
+                            <a
+                              href={msg.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-2 text-blue-200 hover:text-white underline mt-1 mb-2"
+                            >
                               <Paperclip className="w-4 h-4 shrink-0" />
-                              <span className="truncate min-w-0">{msg.text}</span>
+                              <span className="truncate min-w-0">
+                                {msg.text}
+                              </span>
                             </a>
-                          ) : msg.type === 'audio' && msg.url ? (
+                          ) : msg.type === "audio" && msg.url ? (
                             <div className="mt-1 mb-2">
-                              <audio controls src={msg.url} className="h-10 max-w-[200px]" />
+                              <audio
+                                controls
+                                src={msg.url}
+                                className="h-10 max-w-[200px]"
+                              />
                             </div>
                           ) : (
                             msg.text
                           )}
                         </div>
-                      
-                      <div className={`flex items-center mt-1.5 gap-2 px-1 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                        <span className="text-[11px] text-white/40 font-medium select-none whitespace-nowrap">
-                          {time} {msg.isEdited && '(исправлено)'}
-                        </span>
-                        
-                        {canEditDelete && (
-                          <div className={`flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 ${isMe ? 'flex-row' : 'flex-row-reverse'}`}>
-                            {msg.type === 'text' && (
-                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 sm:p-1 text-white/50 hover:text-blue-400 active:scale-95 transition-transform" title="Редактировать">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                              </button>
-                            )}
-                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 sm:p-1 text-white/50 hover:text-red-400 active:scale-95 transition-transform" title="Удалить">
-                              <X className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
 
-              {/* Input Area */}
-              <div className="p-4 sm:p-8 pt-4 relative z-10 min-w-0 w-full">
-                {!userData?.friends?.includes(selectedUser.id) ? (
-                  <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[28px] text-center text-white/70 border-dashed border-white/20">
-                    <div className="mb-2 text-sm">Сначала добавьте пользователя в друзья, чтобы начать переписку! (Новый чат будет доступен после добавления)</div>
-                    <button 
-                      onClick={async () => {
-                        try {
-                           const reqs = selectedUser.friendRequests || [];
-                           if (!reqs.includes(user.uid)) {
-                             await updateDoc(doc(db, 'users', selectedUser.id), {
-                               friendRequests: [...reqs, user.uid]
-                             });
-                             alert('Заявка отправлена!');
-                           } else {
-                             alert('Заявка уже отправлена!');
-                           }
-                        } catch(e) { console.error(e) }
-                      }}
-                      className="text-sm text-blue-400 hover:text-blue-300 font-medium px-6 py-2 bg-blue-500/10 hover:bg-blue-500/20 transition-all rounded-xl border border-blue-500/30"
-                    >
-                      {selectedUser?.friendRequests?.includes(user?.uid) ? 'Заявка отправлена' : 'Попросить добавить в др'}
-                    </button>
-                  </div>
-                ) : (
-                  <>
-                  {showEmoji && (
-                    <div className="absolute bottom-[80px] left-4 z-50 shadow-2xl">
-                      <EmojiPicker 
-                        theme={"dark" as any} 
-                        onEmojiClick={(emoji) => setInputValue(prev => prev + emoji.emoji)}
-                      />
-                    </div>
-                  )}
-                  
-                  <form onSubmit={handleSend} className="bg-white/5 backdrop-blur-2xl border border-white/10 p-2 rounded-[28px] flex items-center gap-1">
-                  <div className="flex gap-1 pl-2 shrink-0">
-                    <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
-                      <Smile className="w-5 h-5" />
-                    </button>
-                    
-                    <input type="file" ref={imageInputRef} className="hidden" accept="image/*" onChange={(e) => handleFileUpload(e, true)} />
-                    <button type="button" onClick={() => imageInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
-                      <ImageIcon className="w-5 h-5" />
-                    </button>
-                    
-                    <input type="file" ref={fileInputRef} className="hidden" accept="*" onChange={(e) => handleFileUpload(e, false)} />
-                    <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0">
-                      <Paperclip className="w-5 h-5" />
-                    </button>
-                  </div>
-                  
-                  {isRecording ? (
-                    <div className="flex-1 px-4 py-2 text-sm text-red-400 font-medium flex items-center gap-2 animate-pulse min-w-0">
-                      <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
-                      <span className="truncate">Recording {formatTime(recordingTime)}...</span>
+                        <div
+                          className={`flex items-center mt-1.5 gap-2 px-1 ${isMe ? "flex-row-reverse" : "flex-row"}`}
+                        >
+                          <span className="text-[11px] text-white/40 font-medium select-none whitespace-nowrap">
+                            {time} {msg.isEdited && "(исправлено)"}
+                          </span>
+
+                          {canEditDelete && (
+                            <div
+                              className={`flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0 ${isMe ? "flex-row" : "flex-row-reverse"}`}
+                            >
+                              {msg.type === "text" && (
+                                <button
+                                  onClick={() => {
+                                    setEditingMessage(msg);
+                                    setEditingText(msg.text);
+                                  }}
+                                  className="p-1 sm:p-1 text-white/50 hover:text-blue-400 active:scale-95 transition-transform"
+                                  title="Редактировать"
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    className="w-4 h-4 sm:w-3.5 sm:h-3.5"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  >
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                                  </svg>
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleDeleteMessage(msg.id)}
+                                className="p-1 sm:p-1 text-white/50 hover:text-red-400 active:scale-95 transition-transform"
+                                title="Удалить"
+                              >
+                                <X className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Input Area */}
+                <div className="p-4 sm:p-8 pt-4 relative z-10 min-w-0 w-full">
+                  {!userData?.friends?.includes(selectedUser.id) ? (
+                    <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[28px] text-center text-white/70 border-dashed border-white/20">
+                      <div className="mb-2 text-sm">
+                        Сначала добавьте пользователя в друзья, чтобы начать
+                        переписку! (Новый чат будет доступен после добавления)
+                      </div>
+                      <button
+                        onClick={async () => {
+                          try {
+                            const reqs = selectedUser.friendRequests || [];
+                            if (!reqs.includes(user.uid)) {
+                              await updateDoc(
+                                doc(db, "users", selectedUser.id),
+                                {
+                                  friendRequests: [...reqs, user.uid],
+                                },
+                              );
+                              alert("Заявка отправлена!");
+                            } else {
+                              alert("Заявка уже отправлена!");
+                            }
+                          } catch (e) {
+                            console.error(e);
+                          }
+                        }}
+                        className="text-sm text-blue-400 hover:text-blue-300 font-medium px-6 py-2 bg-blue-500/10 hover:bg-blue-500/20 transition-all rounded-xl border border-blue-500/30"
+                      >
+                        {selectedUser?.friendRequests?.includes(user?.uid)
+                          ? "Заявка отправлена"
+                          : "Попросить добавить в др"}
+                      </button>
                     </div>
                   ) : (
-                    <textarea 
-                      value={inputValue}
-                      onChange={(e) => handleTyping(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSend(e);
-                        }
-                      }}
-                      placeholder="Enter signal..." 
-                      className="flex-1 bg-transparent px-2 sm:px-4 py-2 text-base sm:text-sm text-white placeholder-white/40 focus:outline-none resize-none min-h-[40px] max-h-32 scrollbar-hide min-w-0"
-                      rows={1}
-                    />
+                    <>
+                      {showEmoji && (
+                        <div className="absolute bottom-[80px] left-4 z-50 shadow-2xl">
+                          <EmojiPicker
+                            theme={"dark" as any}
+                            onEmojiClick={(emoji) =>
+                              setInputValue((prev) => prev + emoji.emoji)
+                            }
+                          />
+                        </div>
+                      )}
+
+                      <form
+                        onSubmit={handleSend}
+                        className="bg-white/5 backdrop-blur-2xl border border-white/10 p-2 rounded-[28px] flex items-center gap-1"
+                      >
+                        <div className="flex gap-1 pl-2 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setShowEmoji(!showEmoji)}
+                            className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0"
+                          >
+                            <Smile className="w-5 h-5" />
+                          </button>
+
+                          <input
+                            type="file"
+                            ref={imageInputRef}
+                            className="hidden"
+                            accept="image/*"
+                            onChange={(e) => handleFileUpload(e, true)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => imageInputRef.current?.click()}
+                            className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0"
+                          >
+                            <ImageIcon className="w-5 h-5" />
+                          </button>
+
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            className="hidden"
+                            accept="*"
+                            onChange={(e) => handleFileUpload(e, false)}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors shrink-0"
+                          >
+                            <Paperclip className="w-5 h-5" />
+                          </button>
+                        </div>
+
+                        {isRecording ? (
+                          <div className="flex-1 px-4 py-2 text-sm text-red-400 font-medium flex items-center gap-2 animate-pulse min-w-0">
+                            <div className="w-2 h-2 rounded-full bg-red-500 shrink-0"></div>
+                            <span className="truncate">
+                              Recording {formatTime(recordingTime)}...
+                            </span>
+                          </div>
+                        ) : (
+                          <textarea
+                            value={inputValue}
+                            onChange={(e) => handleTyping(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                handleSend(e);
+                              }
+                            }}
+                            placeholder="Enter signal..."
+                            className="flex-1 bg-transparent px-2 sm:px-4 py-2 text-base sm:text-sm text-white placeholder-white/40 focus:outline-none resize-none min-h-[40px] max-h-32 scrollbar-hide min-w-0"
+                            rows={1}
+                          />
+                        )}
+
+                        <div className="pr-1 flex gap-1 items-center shrink-0">
+                          {!inputValue.trim() && !isRecording ? (
+                            <button
+                              type="button"
+                              onClick={startRecording}
+                              className="w-10 h-10 flex items-center justify-center bg-transparent hover:bg-white/10 text-white/60 rounded-full transition-colors shrink-0"
+                            >
+                              <Mic className="w-5 h-5" />
+                            </button>
+                          ) : isRecording ? (
+                            <button
+                              type="button"
+                              onClick={stopRecording}
+                              className="w-10 h-10 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-full transition-colors shrink-0"
+                            >
+                              <Square className="w-4 h-4 fill-current" />
+                            </button>
+                          ) : (
+                            <button
+                              type="submit"
+                              className={`w-12 h-10 flex items-center justify-center ${t.accentBtn} ${t.accentHover} text-white rounded-2xl transition-colors shadow-lg ${t.accentGlow} shrink-0`}
+                            >
+                              <Send className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+                      </form>
+                    </>
                   )}
-                  
-                  <div className="pr-1 flex gap-1 items-center shrink-0">
-                    {!inputValue.trim() && !isRecording ? (
-                      <button type="button" onClick={startRecording} className="w-10 h-10 flex items-center justify-center bg-transparent hover:bg-white/10 text-white/60 rounded-full transition-colors shrink-0">
-                        <Mic className="w-5 h-5" />
-                      </button>
-                    ) : isRecording ? (
-                      <button type="button" onClick={stopRecording} className="w-10 h-10 flex items-center justify-center bg-red-500/20 hover:bg-red-500/40 text-red-400 rounded-full transition-colors shrink-0">
-                        <Square className="w-4 h-4 fill-current" />
-                      </button>
-                    ) : (
-                      <button type="submit" className={`w-12 h-10 flex items-center justify-center ${t.accentBtn} ${t.accentHover} text-white rounded-2xl transition-colors shadow-lg ${t.accentGlow} shrink-0`}>
-                        <Send className="w-5 h-5" />
-                      </button>
-                    )}
-                  </div>
-                </form>
-                </>
-              )}
-              </div>
-            </>
-          )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
-      </div>
       )}
     </div>
   );

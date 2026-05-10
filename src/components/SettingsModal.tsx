@@ -18,6 +18,7 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [spyMode, setSpyMode] = useState(currentUserData?.spyMode || false);
   const [antiLimit, setAntiLimit] = useState(currentUserData?.antiLimit || false);
+  const [ringtone, setRingtone] = useState(currentUserData?.ringtone || 'modern');
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -86,6 +87,7 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
         displayName: displayName,
         photoURL: finalAvatarUrl,
         theme: currentTheme,
+        ringtone: ringtone,
       };
       
       const isKonata = currentUserData?.username === '@Konataizumi' || currentUserData?.username === '@KonataSecret';
@@ -193,6 +195,24 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
                   <span className="text-sm text-white">{t.name}</span>
                 </button>
               ))}
+            </div>
+          </section>
+
+          {/* Call Settings Section */}
+          <section className="space-y-4">
+            <h3 className="text-sm font-medium text-blue-300 uppercase tracking-wider flex items-center gap-2">
+              Рингтон
+            </h3>
+            <div className="grid grid-cols-1 gap-3">
+              <select 
+                value={ringtone} 
+                onChange={(e) => setRingtone(e.target.value)}
+                className="w-full bg-black/20 border border-white/10 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-blue-500/50 appearance-none"
+              >
+                <option value="modern" className="bg-[#0f172a]">Современный (Modern)</option>
+                <option value="digital" className="bg-[#0f172a]">Цифровой будильник (Digital)</option>
+                <option value="retro" className="bg-[#0f172a]">Ретро звонок (Retro)</option>
+              </select>
             </div>
           </section>
 
