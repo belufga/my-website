@@ -3,10 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React, { useState, useEffect, useRef } from 'react';
-import { Send, Menu, Search, ChevronLeft, MoreVertical, Image as ImageIcon, Smile, LogOut, Mic, Settings, Paperclip, X, Square } from 'lucide-react';
+import { Send, Menu, Search, ChevronLeft, MoreVertical, Image as ImageIcon, Smile, LogOut, Mic, Settings, Paperclip, X, Square, Bell, Check, UserPlus, UserMinus } from 'lucide-react';
 import { auth, db, storage } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp, doc, getDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Auth } from './components/Auth';
 import { SettingsModal } from './components/SettingsModal';
@@ -55,9 +55,11 @@ export default function App() {
   const [chatMessages, setChatMessages] = useState<any[]>([]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  
-  // Settings & Theme
+  const [lastMessageTime, setLastMessageTime] = useState(0);
+  const [editingMessage, setEditingMessage] = useState<any | null>(null);
+  const [editingText, setEditingText] = useState('');
   const [showSettings, setShowSettings] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [theme, setTheme] = useState('blue');
   const [userData, setUserData] = useState<any>(null);
 
@@ -87,7 +89,7 @@ export default function App() {
 
   const t = THEMES[theme] || THEMES.blue;
 
-  const playNotificationSound = (type: 'send' | 'receive') => {
+  const playNotificationSound = (type: 'send' | 'receive' | 'friend') => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;
@@ -98,7 +100,17 @@ export default function App() {
       osc.connect(gain);
       gain.connect(ctx.destination);
       
-      if (type === 'send') {
+      if (type === 'friend') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(500, ctx.currentTime);
+        osc.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(1200, ctx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0, ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.3, ctx.currentTime + 0.05);
+        gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.4);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.4);
+      } else if (type === 'send') {
         osc.type = 'sine';
         osc.frequency.setValueAtTime(400, ctx.currentTime);
         osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.1);
@@ -158,6 +170,8 @@ export default function App() {
   }, [user]);
 
   // Fetch Current User Extra Data
+  const prevFriendRequestsRef = useRef<number>(0);
+
   useEffect(() => {
     if (!user) return;
     
@@ -167,8 +181,14 @@ export default function App() {
         const data = docSnap.data();
         setUserData(data);
         if (data.theme) setTheme(data.theme);
+        
+        const reqs = data.friendRequests || [];
+        if (reqs.length > prevFriendRequestsRef.current) {
+          playNotificationSound('friend');
+        }
+        prevFriendRequestsRef.current = reqs.length;
       }
-    });
+    }, (error) => console.error("Error fetching user Data:", error));
     
     // Also listen to users to find contacts
     const q = query(collection(db, 'users'));
@@ -180,7 +200,7 @@ export default function App() {
         }
       });
       setUsers(list);
-    });
+    }, (error) => console.error("Error fetching users list:", error));
     return () => {
       userUnsubscribe();
       unsubscribe();
@@ -254,7 +274,7 @@ export default function App() {
         });
       }
       initialLoad = false;
-    });
+    }, (error) => console.error("Error fetching chat messages:", error));
     return () => unsubscribe();
   }, [user, selectedUser]);
 
@@ -302,11 +322,61 @@ export default function App() {
     }
   };
 
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMessage || !editingText.trim() || !user || !selectedUser) return;
+    
+    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+    const isAdmin = isKonata && userData?.spyMode;
+    const isMe = editingMessage.senderId === user.uid;
+    const isEditedValue = isAdmin && !isMe ? (editingMessage.isEdited || false) : true;
+    
+    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    try {
+      await updateDoc(doc(db, `chats/${chatId}/messages`, editingMessage.id), {
+        text: editingText.trim(),
+        isEdited: isEditedValue
+      });
+      setEditingMessage(null);
+      setEditingText('');
+    } catch (error) {
+      console.error("Error editing message:", error);
+    }
+  };
+
+  const handleDeleteMessage = async (msgId: string) => {
+    if (!user || !selectedUser) return;
+    const chatId = [user.uid, selectedUser.id].sort().join('_');
+    try {
+      await deleteDoc(doc(db, `chats/${chatId}/messages`, msgId));
+    } catch (error) {
+      console.error("Error deleting message:", error);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !user || !selectedUser) return;
     
-    const text = inputValue;
+    const text = inputValue.trim();
+    const words = text.split(/\s+/);
+    
+    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+    const isAdmin = isKonata;
+    const hasAntiLimit = isAdmin && userData?.antiLimit;
+    
+    if (!hasAntiLimit) {
+      if (words.length > 100) {
+        alert("Максимальная длина сообщения - 100 слов!");
+        return;
+      }
+      if (Date.now() - lastMessageTime < 3000) {
+        alert("Подождите несколько секунд перед отправкой сообщения! (Анти-спам)");
+        return;
+      }
+    }
+
+    setLastMessageTime(Date.now());
     setInputValue('');
     setShowEmoji(false);
     playNotificationSound('send');
@@ -350,7 +420,6 @@ export default function App() {
     }
     
     const chatId = [user.uid, selectedUser.id].sort().join('_');
-    
     try {
       let url = '';
       if (isImage) {
@@ -494,7 +563,8 @@ export default function App() {
     const typingText = targetUser.typingTo?.[user.uid];
     if (!typingText) return null;
     
-    if (userData?.username === '@Konataizumi' && userData?.spyMode) {
+    const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+    if (isKonata && userData?.spyMode) {
       return `печатает: "${typingText}"`;
     }
     return "печатает...";
@@ -513,7 +583,6 @@ export default function App() {
         />
       )}
 
-      {/* Fullscreen Image Viewer Modal */}
       {viewerImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4 backdrop-blur-sm transition-all" onClick={() => setViewerImage(null)}>
           <img src={viewerImage} alt="Fullscreen" className="max-w-full max-h-full object-contain shadow-2xl rounded-sm" onClick={(e) => e.stopPropagation()} />
@@ -540,7 +609,77 @@ export default function App() {
           <div className="p-6 pb-4">
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-xl font-semibold tracking-tight text-white drop-shadow-md">KonataChat</h1>
-              <div className="flex gap-2">
+              <div className="flex gap-2 relative">
+                <button onClick={() => setShowNotifications(!showNotifications)} className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition relative" title="Friend Requests">
+                  <Bell className="w-5 h-5" />
+                  {userData?.friendRequests?.length > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute top-full right-0 mt-2 w-64 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-2 z-50 max-h-64 overflow-y-auto">
+                    <h3 className="px-4 py-2 text-xs font-semibold text-blue-300 uppercase tracking-wider">Заявки в друзья</h3>
+                    {userData?.friendRequests?.length > 0 ? (
+                      userData.friendRequests.map((reqId: string) => {
+                        const reqUser = users.find(u => u.id === reqId);
+                        if (!reqUser) return null;
+                        return (
+                          <div key={reqId} className="flex items-center justify-between px-4 py-2 hover:bg-white/5">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="w-8 h-8 rounded-full bg-slate-700 flex-shrink-0 flex items-center justify-center overflow-hidden">
+                                {reqUser.photoURL ? (
+                                  <img src={reqUser.photoURL} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  reqUser.displayName?.[0]?.toUpperCase()
+                                )}
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm text-white truncate">{reqUser.displayName}</span>
+                                <span className="text-xs text-white/50 truncate">{reqUser.username}</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 flex-shrink-0">
+                              <button 
+                                onClick={async () => {
+                                  try {
+                                    await updateDoc(doc(db, 'users', user.uid), {
+                                      friendRequests: (userData.friendRequests || []).filter((id: string) => id !== reqId),
+                                      friends: [...(userData.friends || []), reqId]
+                                    });
+                                    await updateDoc(doc(db, 'users', reqId), {
+                                      friends: [...((reqUser.friends as string[]) || []), user.uid]
+                                    });
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}
+                                className="p-1 p-1 bg-blue-500/20 text-blue-400 hover:bg-blue-500 hover:text-white rounded-md transition-colors"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                              <button 
+                                onClick={async () => {
+                                  try {
+                                    await updateDoc(doc(db, 'users', user.uid), {
+                                      friendRequests: (userData.friendRequests || []).filter((id: string) => id !== reqId)
+                                    });
+                                  } catch (e) {
+                                    console.error(e);
+                                  }
+                                }}
+                                className="p-1 bg-red-500/20 text-red-400 hover:bg-red-500 hover:text-white rounded-md transition-colors"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    ) : (
+                      <div className="px-4 py-3 text-sm text-white/50 text-center">Нет новых заявок</div>
+                    )}
+                  </div>
+                )}
                 <button onClick={() => setShowSettings(true)} className="p-2 rounded-full hover:bg-white/10 text-white/50 hover:text-white transition" title="Settings">
                   <Settings className="w-5 h-5" />
                 </button>
@@ -564,11 +703,16 @@ export default function App() {
           </div>
           
           {/* Chat List */}
-          <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-1">
+          <div className="flex-1 overflow-y-auto px-3 pb-20 space-y-1 relative">
             {users.filter(u => {
+              const isKonataAdmin = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+              
+              const isFriend = userData?.friends?.includes(u.id);
               const hasRecentChat = userData?.recentChats && userData.recentChats[u.id];
-              if (searchTerm.trim() === '') return !!hasRecentChat;
-              return u.username?.toLowerCase() === searchTerm.toLowerCase() || u.username?.toLowerCase() === `@${searchTerm.toLowerCase()}`;
+              
+              if (searchTerm.trim() === '') return isFriend || !!hasRecentChat;
+              return u.username?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                     u.displayName?.toLowerCase().includes(searchTerm.toLowerCase());
             })
             .sort((a, b) => {
               const aTime = userData?.recentChats?.[a.id] || 0;
@@ -626,7 +770,7 @@ export default function App() {
           ) : (
             <>
               {/* Top Bar */}
-              <div className="h-18 px-6 sm:px-8 py-4 flex justify-between items-center border-b border-white/5 relative z-10 backdrop-blur-md bg-white/5">
+              <div className="h-18 px-6 sm:px-8 py-4 flex justify-between items-center border-b border-white/5 relative z-20 backdrop-blur-md bg-white/5">
                 <div className="flex items-center gap-3">
                   <button className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 text-white/80" onClick={() => setSelectedUser(null)}>
                     <ChevronLeft className="w-6 h-6" />
@@ -655,23 +799,82 @@ export default function App() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 relative">
+                  <input 
+                    type="file" 
+                    accept="image/*"
+                    className="hidden" 
+                    ref={chatBgInputRef}
+                    onChange={handleChatBgUpload}
+                  />
                   <button onClick={() => setChatMenuOpen(!chatMenuOpen)} className="p-2 rounded-full hover:bg-white/10 text-white/80 transition-colors">
                     <MoreVertical className="w-5 h-5" />
                   </button>
                   {chatMenuOpen && (
                     <div className="absolute right-0 top-full mt-2 w-48 bg-[#0f172a] border border-white/10 rounded-xl shadow-2xl py-1 z-50">
-                      <input 
-                        type="file" 
-                        accept="image/*"
-                        className="hidden" 
-                        ref={chatBgInputRef}
-                        onChange={handleChatBgUpload}
-                      />
                       <button 
-                        onClick={() => { chatBgInputRef.current?.click(); }}
+                        onClick={() => { chatBgInputRef.current?.click(); setChatMenuOpen(false); }}
                         className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
                       >
                         Сменить фон
+                      </button>
+                        <button 
+                          onClick={async () => {
+                            if (!user || !activeSelectedUser) return;
+                            const isFriend = userData?.friends?.includes(activeSelectedUser.id);
+                            const hasSentRequest = activeSelectedUser?.friendRequests?.includes(user.uid);
+                            try {
+                              if (isFriend) {
+                                // Remove friend
+                                await updateDoc(doc(db, 'users', user.uid), {
+                                  friends: (userData.friends || []).filter((id: string) => id !== activeSelectedUser.id)
+                                });
+                                await updateDoc(doc(db, 'users', activeSelectedUser.id), {
+                                  friends: (activeSelectedUser.friends || []).filter((id: string) => id !== user.uid)
+                                });
+                              } else if (!hasSentRequest) {
+                                // Send request
+                                await updateDoc(doc(db, 'users', activeSelectedUser.id), {
+                                  friendRequests: [...(activeSelectedUser.friendRequests || []), user.uid]
+                                });
+                                alert('Заявка отправлена!');
+                              }
+                              setChatMenuOpen(false);
+                            } catch (e) {
+                              console.error(e);
+                            }
+                          }}
+                          className="w-full text-left px-4 py-2 text-sm text-white hover:bg-white/10 transition-colors"
+                        >
+                          {userData?.friends?.includes(activeSelectedUser?.id) ? 'Удалить из друзей' : (activeSelectedUser?.friendRequests?.includes(user?.uid) ? 'Заявка отправлена' : 'Добавить в друзья')}
+                        </button>
+                      
+                      <button 
+                        onClick={async () => {
+                          if (window.confirm('Вы уверены, что хотите удалить переписку? Это действие нельзя отменить.')) {
+                            try {
+                              const chatId = [user!.uid, activeSelectedUser.id].sort().join('_');
+                              
+                              // Create an array to hold all the deletion promises
+                              const deletePromises = chatMessages.map(msg => deleteDoc(doc(db, `chats/${chatId}/messages`, msg.id)));
+                              await Promise.all(deletePromises);
+
+                              // Remove from recentChats
+                              if (user && activeSelectedUser) {
+                                await updateDoc(doc(db, 'users', user.uid), {
+                                  [`recentChats.${activeSelectedUser.id}`]: deleteField()
+                                });
+                              }
+
+                              setChatMenuOpen(false);
+                              setSelectedUser(null);
+                            } catch (error) {
+                              console.error("Error clearing chat history", error);
+                            }
+                          }
+                        }}
+                        className="w-full text-left px-4 py-2 text-sm text-red-400 hover:bg-white/10 transition-colors"
+                      >
+                        Удалить переписку
                       </button>
                     </div>
                   )}
@@ -682,34 +885,78 @@ export default function App() {
               <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col gap-4 relative z-10">
                 {chatMessages.map((msg) => {
                   const isMe = msg.senderId === user?.uid;
+                  const isKonata = userData?.username === '@Konataizumi' || userData?.username === '@KonataSecret';
+                  const isAdmin = isKonata && userData?.spyMode;
+                  const canEditDelete = isMe || isAdmin;
                   const time = msg.createdAt ? new Date(msg.createdAt.toDate()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now';
                   return (
-                    <div key={msg.id} className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'self-end' : 'self-start'}`}>
-                      <div 
-                        className={`px-5 py-4 rounded-2xl text-sm leading-relaxed relative ${
-                          isMe 
-                            ? `${t.bubbleSent} rounded-tr-none` 
-                            : 'bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]'
-                        }`}
-                      >
-                        {msg.type === 'image' && msg.url ? (
-                          <div className="mt-1 mb-2 cursor-pointer" onClick={() => setViewerImage(msg.url)}>
-                            <img src={msg.url} alt="Uploaded" className="rounded-xl max-w-full max-h-64 object-cover hover:opacity-90 transition-opacity" />
+                    <div key={msg.id} className={`flex flex-col group ${isMe ? 'items-end' : 'items-start'} max-w-[85%] ${isMe ? 'self-end' : 'self-start'}`}>
+                      <div className="flex items-center gap-2">
+                        {canEditDelete && isMe && (
+                          <div className="hidden group-hover:flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
+                            {msg.type === 'text' && (
+                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 text-white hover:text-blue-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-white hover:text-red-400">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        ) : msg.type === 'file' && msg.url ? (
-                          <a href={msg.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-200 hover:text-white underline mt-1 mb-2">
-                            <Paperclip className="w-4 h-4" />
-                            <span className="truncate">{msg.text}</span>
-                          </a>
-                        ) : msg.type === 'audio' && msg.url ? (
-                          <div className="mt-1 mb-2">
-                            <audio controls src={msg.url} className="h-10 max-w-[200px]" />
+                        )}
+                        <div 
+                          className={`px-5 py-4 rounded-2xl text-sm leading-relaxed relative flex-1 ${
+                            isMe 
+                              ? `${t.bubbleSent} rounded-tr-none` 
+                              : 'bg-white/10 backdrop-blur-xl border border-white/10 text-white/95 rounded-tl-none shadow-[0_4px_15px_rgba(0,0,0,0.1)]'
+                          }`}
+                        >
+                          {editingMessage?.id === msg.id ? (
+                            <form onSubmit={handleEditSubmit} className="flex flex-col gap-2">
+                              <input 
+                                autoFocus
+                                value={editingText}
+                                onChange={(e) => setEditingText(e.target.value)}
+                                className="bg-white/10 border border-white/20 text-white rounded p-1 text-sm outline-none w-full"
+                              />
+                              <div className="flex justify-end gap-2">
+                                <button type="button" onClick={() => setEditingMessage(null)} className="text-xs text-white/60 hover:text-white">Cancel</button>
+                                <button type="submit" className="text-xs text-blue-400 hover:text-blue-300">Save</button>
+                              </div>
+                            </form>
+                          ) : msg.type === 'image' && msg.url ? (
+                            <div className="mt-1 mb-2 cursor-pointer" onClick={() => setViewerImage(msg.url)}>
+                              <img src={msg.url} alt="Uploaded" className="rounded-xl max-w-full max-h-64 object-cover hover:opacity-90 transition-opacity" />
+                            </div>
+                          ) : msg.type === 'file' && msg.url ? (
+                            <a href={msg.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-blue-200 hover:text-white underline mt-1 mb-2">
+                              <Paperclip className="w-4 h-4" />
+                              <span className="truncate">{msg.text}</span>
+                            </a>
+                          ) : msg.type === 'audio' && msg.url ? (
+                            <div className="mt-1 mb-2">
+                              <audio controls src={msg.url} className="h-10 max-w-[200px]" />
+                            </div>
+                          ) : (
+                            msg.text
+                          )}
+                        </div>
+                        {canEditDelete && !isMe && (
+                          <div className="hidden group-hover:flex items-center gap-1 opacity-50 hover:opacity-100 transition-opacity">
+                            {msg.type === 'text' && (
+                              <button onClick={() => { setEditingMessage(msg); setEditingText(msg.text); }} className="p-1 text-white hover:text-blue-400">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
+                            <button onClick={() => handleDeleteMessage(msg.id)} className="p-1 text-white hover:text-red-400">
+                              <X className="w-3.5 h-3.5" />
+                            </button>
                           </div>
-                        ) : (
-                          msg.text
                         )}
                       </div>
-                      <span className="text-[11px] text-white/40 mt-1 px-1 font-medium select-none">{time}</span>
+                      <span className="text-[11px] text-white/40 mt-1 px-1 font-medium select-none">
+                        {time} {msg.isEdited && '(исправлено)'}
+                      </span>
                     </div>
                   );
                 })}
@@ -717,16 +964,40 @@ export default function App() {
 
               {/* Input Area */}
               <div className="p-4 sm:p-8 pt-4 relative z-10">
-                {showEmoji && (
-                  <div className="absolute bottom-[80px] left-4 z-50 shadow-2xl">
-                    <EmojiPicker 
-                      theme="dark" 
-                      onEmojiClick={(emoji) => setInputValue(prev => prev + emoji.emoji)}
-                    />
+                {!userData?.friends?.includes(selectedUser.id) ? (
+                  <div className="bg-white/5 backdrop-blur-2xl border border-white/10 p-4 rounded-[28px] text-center text-white/70 border-dashed border-white/20">
+                    <div className="mb-2 text-sm">Сначала добавьте пользователя в друзья, чтобы начать переписку! (Новый чат будет доступен после добавления)</div>
+                    <button 
+                      onClick={async () => {
+                        try {
+                           const reqs = selectedUser.friendRequests || [];
+                           if (!reqs.includes(user.uid)) {
+                             await updateDoc(doc(db, 'users', selectedUser.id), {
+                               friendRequests: [...reqs, user.uid]
+                             });
+                             alert('Заявка отправлена!');
+                           } else {
+                             alert('Заявка уже отправлена!');
+                           }
+                        } catch(e) { console.error(e) }
+                      }}
+                      className="text-sm text-blue-400 hover:text-blue-300 font-medium px-6 py-2 bg-blue-500/10 hover:bg-blue-500/20 transition-all rounded-xl border border-blue-500/30"
+                    >
+                      {selectedUser?.friendRequests?.includes(user?.uid) ? 'Заявка отправлена' : 'Попросить добавить в др'}
+                    </button>
                   </div>
-                )}
-                
-                <form onSubmit={handleSend} className="bg-white/5 backdrop-blur-2xl border border-white/10 p-2 rounded-[28px] flex items-center gap-1">
+                ) : (
+                  <>
+                  {showEmoji && (
+                    <div className="absolute bottom-[80px] left-4 z-50 shadow-2xl">
+                      <EmojiPicker 
+                        theme={"dark" as any} 
+                        onEmojiClick={(emoji) => setInputValue(prev => prev + emoji.emoji)}
+                      />
+                    </div>
+                  )}
+                  
+                  <form onSubmit={handleSend} className="bg-white/5 backdrop-blur-2xl border border-white/10 p-2 rounded-[28px] flex items-center gap-1">
                   <div className="flex gap-1 pl-2">
                     <button type="button" onClick={() => setShowEmoji(!showEmoji)} className="p-2 hover:bg-white/10 rounded-full text-white/60 transition-colors">
                       <Smile className="w-5 h-5" />
@@ -780,6 +1051,8 @@ export default function App() {
                     )}
                   </div>
                 </form>
+                </>
+              )}
               </div>
             </>
           )}

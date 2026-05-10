@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { X, Save, Palette, User as UserIcon, Upload } from 'lucide-react';
 import { updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { auth, db, storage } from '../lib/firebase';
 
@@ -17,6 +17,7 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
   const [avatarUrl, setAvatarUrl] = useState(currentUserData?.photoURL || auth.currentUser?.photoURL || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [spyMode, setSpyMode] = useState(currentUserData?.spyMode || false);
+  const [antiLimit, setAntiLimit] = useState(currentUserData?.antiLimit || false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -87,8 +88,10 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
         theme: currentTheme,
       };
       
-      if (currentUserData?.username === '@Konataizumi') {
+      const isKonata = currentUserData?.username === '@Konataizumi' || currentUserData?.username === '@KonataSecret';
+      if (isKonata) {
         baseUpdate.spyMode = spyMode;
+        baseUpdate.antiLimit = antiLimit;
       }
 
       await updateDoc(doc(db, 'users', auth.currentUser.uid), baseUpdate);
@@ -192,7 +195,7 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
           </section>
 
           {/* Admin Section */}
-          {currentUserData?.username === '@Konataizumi' && (
+          {(currentUserData?.username === '@Konataizumi' || currentUserData?.username === '@KonataSecret') && (
             <section className="space-y-4">
               <h3 className="text-sm font-medium text-red-400 uppercase tracking-wider flex items-center gap-2">
                 Режим администратора
@@ -206,8 +209,43 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
                 />
                 <span className="text-sm text-white/80">Видеть текст который пишут люди (Spy Mode)</span>
               </label>
+              
+              <label className="flex items-center gap-3 cursor-pointer mt-2">
+                <input 
+                  type="checkbox" 
+                  checked={antiLimit}
+                  onChange={(e) => setAntiLimit(e.target.checked)}
+                  className="w-5 h-5 accent-red-500 rounded bg-white/10 border-white/20"
+                />
+                <span className="text-sm text-white/80">Анти-лимит (Спам мод)</span>
+              </label>
             </section>
           )}
+
+          {/* Danger Section */}
+          <section className="space-y-4 pt-4 border-t border-white/10">
+            <h3 className="text-sm font-medium text-red-400 uppercase tracking-wider flex items-center gap-2">
+              Опасная зона
+            </h3>
+            <button 
+              onClick={async () => {
+                if (window.confirm('Вы уверены, что хотите удалить все свои переписки?')) {
+                   if (!auth.currentUser) return;
+                   try {
+                     await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+                       recentChats: deleteField()
+                     });
+                     alert('Ваши переписки очищены!');
+                   } catch (e) {
+                     console.error('Failed to clear chats', e);
+                   }
+                }
+              }}
+              className="w-full py-3 bg-red-500/10 border border-red-500/30 hover:bg-red-500/20 text-red-400 rounded-xl font-medium transition-all"
+            >
+              Удалить мои переписки
+            </button>
+          </section>
         </div>
 
         <div className="p-6 border-t border-white/10 bg-black/20">

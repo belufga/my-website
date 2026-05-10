@@ -4,13 +4,13 @@ import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyADzxqmEKZ4g66Uupj48Rqh2vvfBz-wiM8",
-  authDomain: "konata-58ec3.firebaseapp.com",
-  projectId: "konata-58ec3",
-  storageBucket: "konata-58ec3.firebasestorage.app",
-  messagingSenderId: "400619209610",
-  appId: "1:400619209610:web:00599103c95d31f3b6be73",
-  measurementId: "G-19RDGLCE7Z"
+  apiKey: "AIzaSyBn3N7Tf7j-dYeApf13wcBidjaYVIRrXck",
+  authDomain: "konatachat.firebaseapp.com",
+  projectId: "konatachat",
+  storageBucket: "konatachat.firebasestorage.app",
+  messagingSenderId: "812486956824",
+  appId: "1:812486956824:web:52db98d7bc6a08f0bb706d",
+  measurementId: "G-WHH7H9QMGZ"
 };
 
 const app = initializeApp(firebaseConfig);
