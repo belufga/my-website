@@ -72,6 +72,7 @@ export default function App() {
 
   const currentChatId = user && selectedUser ? [user.uid, selectedUser.id].sort().join('_') : null;
   const currentChatBg = currentChatId && userData?.chatBackgrounds?.[currentChatId] ? userData.chatBackgrounds[currentChatId] : '';
+  const activeSelectedUser = users.find(u => u.id === selectedUser?.id) || selectedUser;
 
   
   // Audio Recording
@@ -129,6 +130,32 @@ export default function App() {
     });
     return () => unsubscribe();
   }, []);
+
+  // Online Heartbeat
+  useEffect(() => {
+    if (!user) return;
+    
+    const updateOnlineStatus = () => {
+      updateDoc(doc(db, 'users', user.uid), { lastActive: Date.now() }).catch(() => {});
+    };
+    
+    // Immediate update
+    updateOnlineStatus();
+
+    const interval = setInterval(updateOnlineStatus, 30000); // 30s heartbeat
+    
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateOnlineStatus();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
 
   // Fetch Current User Extra Data
   useEffect(() => {
@@ -231,6 +258,31 @@ export default function App() {
     return () => unsubscribe();
   }, [user, selectedUser]);
 
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTyping = (text: string) => {
+    setInputValue(text);
+    if (!user || !selectedUser) return;
+    
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Immediately clear typing if blank
+    if (!text.trim()) {
+      updateDoc(doc(db, 'users', user.uid), {
+        [`typingTo.${selectedUser.id}`]: ''
+      }).catch(() => {});
+      return;
+    }
+
+    typingTimeoutRef.current = setTimeout(() => {
+      updateDoc(doc(db, 'users', user.uid), {
+        [`typingTo.${selectedUser.id}`]: text
+      }).catch(() => {});
+    }, 500);
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!inputValue.trim() || !user || !selectedUser) return;
@@ -239,6 +291,11 @@ export default function App() {
     setInputValue('');
     setShowEmoji(false);
     playNotificationSound('send');
+    
+    // Clear typing draft immediately when sending
+    updateDoc(doc(db, 'users', user.uid), {
+      [`typingTo.${selectedUser.id}`]: ''
+    }).catch(() => {});
     
     const chatId = [user.uid, selectedUser.id].sort().join('_');
     await addDoc(collection(db, `chats/${chatId}/messages`), {
@@ -405,6 +462,22 @@ export default function App() {
     signOut(auth);
   };
 
+  const isOnline = (targetUser: any) => {
+    if (!targetUser?.lastActive) return false;
+    const diff = Math.abs(Date.now() - targetUser.lastActive);
+    return diff < 120000; // 2 minutes threshold for clock skew and intervals
+  };
+  
+  const getTypingStatus = (targetUser: any) => {
+    if (!targetUser || !user) return null;
+    const typingText = targetUser.typingTo?.[user.uid];
+    if (!typingText) return null;
+    
+    if (userData?.username === '@Konataizumi' && userData?.spyMode) {
+      return `печатает: "${typingText}"`;
+    }
+    return "печатает...";
+  };
 
   if (loading) return <div className="h-[100dvh] bg-[#020617] flex items-center justify-center"><div className="w-8 h-8 rounded-full border-2 border-blue-500 border-t-transparent animate-spin"></div></div>;
 
@@ -488,18 +561,29 @@ export default function App() {
                 className={`p-3 rounded-2xl cursor-pointer transition ${selectedUser?.id === u.id ? `${t.glow1} border border-white/10 shadow-sm` : 'hover:bg-white/5 opacity-70'}`}
               >
                 <div className="flex gap-3 items-center">
-                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center relative overflow-hidden">
-                    {u.photoURL ? (
-                      <img src={u.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-lg font-bold text-white/50">{u.displayName?.[0]?.toUpperCase() || '?'}</span>
+                  <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center relative overflow-visible">
+                    <div className="w-full h-full rounded-full overflow-hidden relative">
+                      {u.photoURL ? (
+                        <img src={u.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-lg font-bold text-white/50 flex items-center justify-center w-full h-full">{u.displayName?.[0]?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    {isOnline(u) && (
+                      <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0f172a] rounded-full z-10" />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-baseline mb-1">
                       <h3 className="font-medium text-white truncate">{u.displayName}</h3>
                     </div>
-                    <p className="text-xs text-white/50 truncate">{u.username}</p>
+                    <p className="text-xs text-white/50 truncate">
+                      {getTypingStatus(u) ? (
+                        <span className="text-blue-400 italic">{getTypingStatus(u)}</span>
+                      ) : (
+                        u.username
+                      )}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -526,16 +610,27 @@ export default function App() {
                   <button className="md:hidden p-2 -ml-2 rounded-full hover:bg-white/10 text-white/80" onClick={() => setSelectedUser(null)}>
                     <ChevronLeft className="w-6 h-6" />
                   </button>
-                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-hidden">
-                    {selectedUser?.photoURL ? (
-                      <img src={selectedUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="font-bold text-white">{selectedUser?.displayName?.[0]?.toUpperCase() || '?'}</span>
+                  <div className="w-10 h-10 rounded-full bg-slate-700 flex items-center justify-center overflow-visible relative">
+                    <div className="w-full h-full rounded-full overflow-hidden relative">
+                      {activeSelectedUser?.photoURL ? (
+                        <img src={activeSelectedUser.photoURL} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="font-bold text-white flex items-center justify-center w-full h-full">{activeSelectedUser?.displayName?.[0]?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    {isOnline(activeSelectedUser) && (
+                      <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white/10 rounded-full z-10" />
                     )}
                   </div>
                   <div>
-                    <h2 className="font-medium text-white">{selectedUser?.displayName}</h2>
-                    <p className="text-xs text-blue-200">{selectedUser?.username}</p>
+                    <h2 className="font-medium text-white">{activeSelectedUser?.displayName}</h2>
+                    <p className="text-xs text-blue-200">
+                      {getTypingStatus(activeSelectedUser) ? (
+                        <span className="text-blue-300 italic">{getTypingStatus(activeSelectedUser)}</span>
+                      ) : (
+                        isOnline(activeSelectedUser) ? "В сети" : activeSelectedUser?.username
+                      )}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 relative">
@@ -635,7 +730,7 @@ export default function App() {
                   ) : (
                     <textarea 
                       value={inputValue}
-                      onChange={(e) => setInputValue(e.target.value)}
+                      onChange={(e) => handleTyping(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();

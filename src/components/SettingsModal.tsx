@@ -16,6 +16,7 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
   const [displayName, setDisplayName] = useState(currentUserData?.displayName || auth.currentUser?.displayName || '');
   const [avatarUrl, setAvatarUrl] = useState(currentUserData?.photoURL || auth.currentUser?.photoURL || '');
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [spyMode, setSpyMode] = useState(currentUserData?.spyMode || false);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -80,11 +81,17 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
         });
       }
       // Update Firestore Profile
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      const baseUpdate: any = {
         displayName: displayName,
         photoURL: finalAvatarUrl,
         theme: currentTheme,
-      });
+      };
+      
+      if (currentUserData?.username === '@Konataizumi') {
+        baseUpdate.spyMode = spyMode;
+      }
+
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), baseUpdate);
       
       onClose();
     } catch (e) {
@@ -183,6 +190,24 @@ export function SettingsModal({ onClose, currentUserData, currentTheme, setTheme
               ))}
             </div>
           </section>
+
+          {/* Admin Section */}
+          {currentUserData?.username === '@Konataizumi' && (
+            <section className="space-y-4">
+              <h3 className="text-sm font-medium text-red-400 uppercase tracking-wider flex items-center gap-2">
+                Режим администратора
+              </h3>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input 
+                  type="checkbox" 
+                  checked={spyMode}
+                  onChange={(e) => setSpyMode(e.target.checked)}
+                  className="w-5 h-5 accent-red-500 rounded bg-white/10 border-white/20"
+                />
+                <span className="text-sm text-white/80">Видеть текст который пишут люди (Spy Mode)</span>
+              </label>
+            </section>
+          )}
         </div>
 
         <div className="p-6 border-t border-white/10 bg-black/20">
