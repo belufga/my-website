@@ -149,6 +149,7 @@ export default function App() {
   >("idle");
   const [callData, setCallData] = useState<{
     chatId: string;
+    callId: string;
     callerId: string;
     receiverId: string;
     isOut: boolean;
@@ -233,9 +234,11 @@ export default function App() {
   const startCall = async (receiver: any) => {
     if (!user) return;
     const chatId = [user.uid, receiver.id].sort().join("_");
+    const callId = Date.now().toString();
     setCallState("calling");
     setCallData({
       chatId,
+      callId,
       callerId: user.uid,
       receiverId: receiver.id,
       isOut: true,
@@ -264,7 +267,7 @@ export default function App() {
         }
       };
 
-      const callDoc = doc(db, `chats/${chatId}/call`, "active");
+      const callDoc = doc(db, `chats/${chatId}/call`, callId);
       const offerCandidates = collection(callDoc, "callerCandidates");
       const answerCandidates = collection(callDoc, "receiverCandidates");
 
@@ -288,6 +291,7 @@ export default function App() {
       await updateDoc(doc(db, "users", receiver.id), {
         incomingCall: {
           chatId,
+          callId,
           callerId: user.uid,
           callerName: userData?.displayName || "Someone",
           type: "audio",
@@ -307,8 +311,11 @@ export default function App() {
             (candSnapshot) => {
               candSnapshot.docChanges().forEach((change) => {
                 if (change.type === "added") {
-                  const candidate = new RTCIceCandidate(change.doc.data());
-                  pc.addIceCandidate(candidate).catch((e) => console.error(e));
+                  const data = change.doc.data();
+                  if (data && data.candidate) {
+                    const candidate = new RTCIceCandidate(data);
+                    pc.addIceCandidate(candidate).catch((e) => console.error("ICE candidate error:", e));
+                  }
                 }
               });
             },
@@ -325,7 +332,7 @@ export default function App() {
       });
     } catch (e: any) {
       console.error("Call failed:", e);
-      if (e.name === "NotAllowedError" || e.message.includes("not allowed")) {
+      if (e.name === "NotAllowedError" || (e.message && e.message.includes("not allowed"))) {
         alert(
           "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
         );
@@ -338,10 +345,10 @@ export default function App() {
 
   const answerCall = async () => {
     if (!user || !userData?.incomingCall) return;
-    const { chatId, callerId } = userData.incomingCall;
+    const { chatId, callId, callerId } = userData.incomingCall;
 
     setCallState("connected");
-    setCallData({ chatId, callerId, receiverId: user.uid, isOut: false });
+    setCallData({ chatId, callId, callerId, receiverId: user.uid, isOut: false });
 
     try {
       const localStream = await navigator.mediaDevices.getUserMedia({
@@ -363,7 +370,7 @@ export default function App() {
         }
       };
 
-      const callDoc = doc(db, `chats/${chatId}/call`, "active");
+      const callDoc = doc(db, `chats/${chatId}/call`, callId);
       const offerCandidates = collection(callDoc, "callerCandidates");
       const answerCandidates = collection(callDoc, "receiverCandidates");
 
@@ -375,12 +382,16 @@ export default function App() {
 
       const callDataSnapshot = await getDoc(callDoc);
       const callDataDoc = callDataSnapshot.data();
-      if (!callDataDoc?.offer) {
+      if (!callDataDoc?.offer || typeof callDataDoc.offer.sdp !== 'string' || !callDataDoc.offer.sdp) {
+        console.error("Invalid offer received from database.");
         cleanupCall();
         return;
       }
 
-      const offerDescription = new RTCSessionDescription(callDataDoc.offer);
+      const offerDescription = new RTCSessionDescription({
+        type: callDataDoc.offer.type,
+        sdp: callDataDoc.offer.sdp
+      });
       await pc.setRemoteDescription(offerDescription);
 
       const answerDescription = await pc.createAnswer();
@@ -409,14 +420,17 @@ export default function App() {
       candidatesUnsubRef.current = onSnapshot(offerCandidates, (snapshot) => {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
-            const candidate = new RTCIceCandidate(change.doc.data());
-            pc.addIceCandidate(candidate).catch((e) => console.log("ICE candidate error:", e));
+            const data = change.doc.data();
+            if (data && data.candidate) {
+              const candidate = new RTCIceCandidate(data);
+              pc.addIceCandidate(candidate).catch((e) => console.log("ICE candidate error:", e));
+            }
           }
         });
       });
     } catch (e: any) {
       console.error("Answer failed:", e);
-      if (e.name === "NotAllowedError" || e.message.includes("not allowed")) {
+      if (e.name === "NotAllowedError" || (e.message && e.message.includes("not allowed"))) {
         alert(
           "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
         );
@@ -429,7 +443,7 @@ export default function App() {
 
   const endCall = async () => {
     if (callData) {
-      const { chatId, isOut, receiverId } = callData;
+      const { chatId, callId, isOut, receiverId } = callData;
       if (isOut) {
         if (receiverId) {
           try {
@@ -439,12 +453,12 @@ export default function App() {
           } catch (e) {}
         }
         try {
-          await updateDoc(doc(db, `chats/${chatId}/call`, "active"), {
+          await updateDoc(doc(db, `chats/${chatId}/call`, callId), {
             status: "ended",
           });
         } catch (e) {}
         try {
-          await deleteDoc(doc(db, `chats/${chatId}/call`, "active"));
+          await deleteDoc(doc(db, `chats/${chatId}/call`, callId));
         } catch (e) {}
       } else {
         if (user) {
@@ -455,7 +469,7 @@ export default function App() {
           } catch (e) {}
         }
         try {
-          await updateDoc(doc(db, `chats/${chatId}/call`, "active"), {
+          await updateDoc(doc(db, `chats/${chatId}/call`, callId), {
             status: "ended",
           });
         } catch (e) {}
@@ -1011,7 +1025,7 @@ export default function App() {
       console.error("Error accessing mic:", err);
       if (
         err.name === "NotAllowedError" ||
-        err.message.includes("not allowed")
+        (err.message && err.message.includes("not allowed"))
       ) {
         alert(
           "Ошибка доступа к микрофону. Разрешите доступ к микрофону в браузере.",
