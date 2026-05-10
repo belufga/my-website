@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { auth, db } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, updateProfile } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, collection, query, where, getDocs } from 'firebase/firestore';
 import { ChevronRight } from 'lucide-react';
 
 interface AuthProps {
@@ -37,6 +37,9 @@ export function Auth({ onSuccess }: AuthProps) {
         } else {
           // Register user
           const formattedUsername = username.startsWith('@') ? username : `@${username}`;
+          
+          // Check if username is already taken via createUser (Firebase Auth will return email-already-in-use error)
+
           const fakeEmail = `${formattedUsername.replace('@', '')}@konata.local`;
           
           const userCredential = await createUserWithEmailAndPassword(auth, fakeEmail, password);
@@ -62,6 +65,8 @@ export function Auth({ onSuccess }: AuthProps) {
          setError('Ошибка: В Firebase Console (Authentication -> Sign-in methods) не включен провайдер "Email/Password". Пожалуйста, включите его!');
       } else if (err.code === 'auth/invalid-credential') {
          setError('Неверный юзернейм или пароль.');
+      } else if (err.code === 'auth/email-already-in-use') {
+         setError('Этот юзернейм уже занят. Пожалуйста, выберите другой.');
       } else {
          setError(err.message || 'Authentication error');
       }
